@@ -1082,6 +1082,113 @@ Load Data with a Database Client
 [user@host ~] podman cp SQL_FILE TARGET_DB_CONTAINER:CONTAINER_PATH
 ```
 
+---
+# Chapter 6.  Troubleshooting Containers
+
+
+Troubleshoot Container Startup
+
+Example
+```
+[root@servera ~]# podman run -d --name a --network net-a docker.io/library/alpine:latest echo "Hello Podman"
+c0bd361f927f7cb9a7d191f9f6c7a55feb73206248021675de4e9f8d61d5052a
+
+[root@servera ~]# podman ps -a
+CONTAINER ID  IMAGE                            COMMAND            CREATED        STATUS                    PORTS       NAMES
+b55b0403f647  docker.io/library/alpine:latest  sleep infinity     2 minutes ago  Up 2 minutes                          c
+c0bd361f927f  docker.io/library/alpine:latest  echo Hello Podman  5 seconds ago  Exited (0) 5 seconds ago              a
+
+[root@servera ~]# podman logs a
+Hello Podman
+```
+
+**Troubleshoot Container Networking**  
+You can use the podman port CONTAINER command to list the current container port mapping.
+```
+[user@host ~]$ podman port CONTAINER
+8000/tcp -> 0.0.0.0:8080
+```
+To verify the application ports in use, list the open network ports in the running container. Use Linux commands such as the socket statistics (ss) command to list open ports. A socket is the combination of a port and an IP address. The ss command lists the open sockets in a system. You can provide the ss command with options to filter and produce the desired output:
+- -p: display the process using the socket
+- -a: display listening and established connections
+- -n: display numeric ports instead of mapped service names
+- -t: display TCP sockets
+```
+[user@host ~]$ podman exec -it CONTAINER ss -pant
+Netid State  ... Local Address:Port   Peer Address:Port   Process
+tcp   LISTEN ...       0.0.0.0:9091        0.0.0.0:*      users:("python",pid=...)
+...output omitted...
+```
+
+To monitor events in Podman, use the podman events command. By default, the podman events command follows new events as they occur continuously. You can use the --stream=false option to force the command to exit after reading the last known event. The following example prints the image pull and container create events.
+```
+[user@host ~]$ podman events --stream=false
+2024-01-16 13:51:46.074958359 -0500 EST system refresh
+2024-01-16 ... -0500 EST image pull 699...47d registry.redhat.io/ubi9/httpd-24  (1)
+2024-01-16 ... -0500 EST container create fb6...ce4 (image=registry.access.redhat.com/ubi9/httpd-24:9.5 (2)
+...output omitted...
+
+# Or
+podman events --since 5m --stream=false
+```
+- (1) - The image pull event.
+- (2) - The container create event.
+
+
+# Chapter 7.  Multi-container Applications with Compose
+The Compose File
+The Compose file is a YAML file that contains the following sections:
+- version (deprecated): Specifies the Compose version used.
+- services: Defines the containers used.
+- networks: Defines the networks used by the containers.
+- volumes: Specifies the volumes used by the containers.
+- configs: Specifies the configurations used by the containers.
+- secrets: Defines the secrets used by the containers.
+
+The secrets and configs objects are mounted as a file in the containers.
+
+**Start and Stop Containers with Podman Compose**
+
+```bash
+[user@host ~]$ podman-compose up
+[user@host ~]$ podman-compose down
+
+```
+The following list shows common podman-compose up command options in their short and long versions:
+- -d, --detach: Start containers in the background.
+- --force-recreate: Re-create containers on start.
+- -V, --renew-anon-volumes: Re-create anonymous volumes.
+- --remove-orphans: Remove containers that do not correspond to services that are defined in the current Compose file.
+
+**Networking**
+![alt text](pic/13.png)
+
+**Volumes**
+![alt text](pic/14.png)
+
+Note:
+|    | **volumes: db-vol: {}** | **volumes: my-volume: external: true**         |
+| --- | --- | --- |
+| Ai tạo volume?  | Podman Compose tự tạo   | Bạn phải tự tạo trước (`podman volume create`) |
+| Quản lý bởi ai? | Podman Compose quản lý  | Người dùng quản lý (Podman Compose chỉ “mượn”) |
+| Dùng cho        | Tạo mới volume dễ dàng  | Tái sử dụng volume đã tồn tại (dữ liệu cũ)     |
+
+You can also define bind mounts by providing a relative or absolute path on your host machine. In the following example, Podman mounts the ./local/redhat directory on the host machine as the /var/lib/postgresql/data directory in the container.
+```
+services:
+  db:
+    image: registry.redhat.io/rhel8/postgresql-13
+    environment:
+      POSTGRESQL_ADMIN_PASSWORD: redhat
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./local/redhat:/var/lib/postgresql/data:Z
+```
+
+
+
+
 
 
 
