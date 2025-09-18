@@ -558,7 +558,7 @@ location="docker.io"
 blocked=true
 ```
 
-# Managing Images
+## Managing Images
 Image management includes different operations:
 
 Tagging image versions so that they map to product versions and updates.
@@ -734,6 +734,7 @@ registry.access.redhat.com/ubi9/httpd-24     latest      ff278ca1805a  13 days a
 docker.io/library/alpine                     latest      9234e8fb04c4  2 months ago   8.6 MB
 ```
 
+---
 # Chapter 4.  Custom Container Images
 
 1. Base image là gì?
@@ -987,6 +988,7 @@ Container được gọi là rootless (không root) khi thỏa 3 điều kiện:
 
 > Vì thế Podman hỗ trợ rootless container tốt hơn Docker.
 
+---
 # Chapter 5.  Persisting Data
 ## Store Data on Host Machine
 Vấn đề: dữ liệu trong container không bền vững
@@ -1134,7 +1136,7 @@ podman events --since 5m --stream=false
 - (1) - The image pull event.
 - (2) - The container create event.
 
-
+---
 # Chapter 7.  Multi-container Applications with Compose
 The Compose File
 The Compose file is a YAML file that contains the following sections:
@@ -1185,11 +1187,215 @@ services:
     volumes:
       - ./local/redhat:/var/lib/postgresql/data:Z
 ```
+- :Z → để Podman relabel thư mục này cho SELinux (bắt buộc trong RHEL/CentOS/Fedora). Nếu không bật SELinux trên host thì có thể bỏ :Z.
 
+Đường dẫn tuyệt đối (absolute path)
+```
+volumes:
+  - /srv/db-data:/var/lib/postgresql/data:Z
+```
 
+Đường dẫn tương đối (relative path)
+```
+volumes:
+  - ./local/redhat:/var/lib/postgresql/data:Z
+```
 
+---
+# Chapter 8.  Container Orchestration with OpenShift and Kubernetes
 
+![alt text](pic/15.png)
 
+**The RHOCP Web Console**
+![alt text](pic/16.png)
 
+**The RHOCP CLI**
 
+*oc login*  
+Before you can interact with your RHOCP cluster, you must authenticate your requests. Use the login command to authenticate your requests.
+```
+[user@host ~]$ oc login https://api.ocp4.example.com:6443
+Username: developer
+Password: developer
+Login successful.
+```
+*oc get*  
+Use the get command to retrieve a list of selected resources in the selected project.
+
+You must specify the resource type to list.
+```
+[user@host ~]$ oc get pod
+NAME                          READY   STATUS    RESTARTS   AGE
+quotes-api-6c9f758574-nk8kd   1/1     Running   0          39m
+quotes-ui-d7d457674-rbkl7     1/1     Running   0          67s
+```
+*oc create*  
+Use the create command to create an RHOCP resource. Developers commonly use the -f flag to indicate the file that contains the JSON or YAML representation of an RHOCP resource.
+
+For example, to create resources from the pod.yaml file, use the following command:
+```
+[user@host ~]$ oc create -f pod.yaml
+pod/quotes-pod created
+```
+*oc delete*  
+Use the delete command to delete an existing RHOCP resource. You must specify the resource type and the resource name.
+
+For example, to delete the quotes-ui pod, use the following command:
+```
+[user@host ~]$ oc delete pod quotes-ui
+pod/quotes-ui deleted
+```
+*oc logs*  
+Use the logs command to print the standard output of a pod. This command requires a pod name as an argument. You can print only logs of a container in a pod, which means the resource type is omitted.
+
+For example, to print the logs from the react-ui pod, use the following command:
+```
+[user@host ~]$ oc logs react-ui
+Compiled successfully!
+
+You can now view ts-page in the browser.
+
+  Local:            http://localhost:3000
+  On Your Network:  http://10.0.1.23:3000
+...output omitted...
+```
+**RHOCP Resources**
+
+![alt text](pic/17.png)
+
+Use the oc explain command to get information about valid fields for an object. For example, execute oc explain pod to get information about possible Pod object fields. You can use the YAML path to get information about a particular field, for example:
+```
+[user@host ~]$ oc explain pod.metadata.name
+KIND:     Pod
+VERSION:  v1
+
+FIELD:    name <string>
+
+DESCRIPTION:
+...output omitted...
+```
+**Label Kubernetes Objects**  
+Labels are key-value pairs that you define in the .metadata.labels object, for example:
+```
+kind: Pod
+apiVersion: v1
+metadata:
+  name: example-pod
+  labels:
+    app: example-pod
+    group: developers
+...object omitted...
+```
+The preceding example contains the app=example-pod and group=developers labels. Developers often use labels to target a set of objects by using the -l or the equivalent --selector option. For example, the following oc get command lists pods that contain the group=developers label:
+```
+[user@host ~]$ oc get pod --selector group=developers
+NAME                          READY   STATUS    RESTARTS   AGE
+example-pod-6c9f758574-7fhg   1/1     Running   5          11d
+```
+![alt text](pic/18.png)
+
+You can create the pod object by saving the YAML definition into a file and then using the oc command, for example:
+```
+[user@host ~]$ oc create -f pod.yaml
+pod/example-pod created
+```
+**Application Networking in RHOCP**
+![alt text](pic/19.png)
+
+## Multi-pod Applications
+
+![alt text](pic/20.png)
+
+![alt text](pic/21.png)
+The preceding route routes requests to the app-ui service endpoints on port 8080. Because the app-ui route does not specify the hostname in the .spec.host field, the hostname is generated in the following format:
+```
+route-name-project-name.default-domain
+
+# 
+<route-name>-<namespace>.<apps-domain>
+```
+Create Routes Imperatively
+You can use the oc expose service command to create a route:
+```
+[user@host ~]$ oc expose service app-ui
+route.route.openshift.io/app-ui exposed
+```
+You can also use the --dry-run=client and -o options to generate a route definition, for example:
+```
+[user@host ~]$ oc expose service app-ui \
+  --dry-run=client -o yaml
+apiVersion: apps/v1
+kind: Route
+metadata:
+  creationTimestamp: null
+...output omitted...
+```
+Note that you can use the oc expose imperative command in the following forms:
+- oc expose pod POD_NAME: create a service for a specific pod.
+- oc expose deployment DEPLOYMENT_NAME: create a service for all pods managed by a controller, in this case a deployment controller.
+- oc expose service SERVICE_NAME: create a route that targets the specified service.
+
+---
+# Một số nhóm lệnh oc
+🔹 1. Thông tin chung về cluster
+```bash
+oc login https://api.cluster.example.com:6443   # Đăng nhập cluster
+oc whoami                                      # Xem user hiện tại
+oc project                                     # Xem project (namespace) hiện tại
+oc projects                                    # Liệt kê tất cả project
+oc status                                      # Tóm tắt trạng thái project hiện tại
+```
+🔹 2. Làm việc với resource (Pod, Service, Route, Deployment…)
+```bash
+oc get pods                                   # Liệt kê pod trong project hiện tại
+oc get svc                                    # Liệt kê services
+oc get routes                                 # Liệt kê routes
+oc get all                                    # Liệt kê tất cả resource
+
+oc describe pod <pod-name>                    # Xem chi tiết pod
+oc logs <pod-name>                            # Xem log của pod
+oc logs -f <pod-name>                         # Tail log (theo dõi liên tục)
+
+oc exec -it <pod-name> -- /bin/bash           # Vào shell trong container
+```
+🔹 3. Tạo & xóa resource
+```bash
+oc new-project myproject                      # Tạo project mới
+oc new-app nginx                              # Deploy nhanh 1 app từ image
+oc apply -f myapp.yaml                        # Tạo/Update resource từ file YAML
+oc delete -f myapp.yaml                       # Xóa resource từ file YAML
+oc delete pod <pod-name>                      # Xóa pod cụ thể
+```
+🔹 4. Route & expose service
+```bash
+oc expose svc my-service                      # Tạo route public cho service
+oc get route                                  # Xem route (URL public)
+```
+🔹 5. Xem & chỉnh sửa cấu hình
+```bash
+oc edit deployment myapp                      # Mở file YAML của deployment để sửa
+oc scale deployment myapp --replicas=3        # Scale app lên 3 pod
+oc rollout status deployment/myapp            # Theo dõi trạng thái rollout
+oc rollout undo deployment/myapp              # Rollback deployment
+```
+🔹 6. Quản lý image & build (OpenShift đặc thù)
+```bash
+oc new-build --binary --name=myapp -l app=myapp     # Tạo build config
+oc start-build myapp --from-dir=. --follow          # Build từ source local
+oc get is                                          # Liệt kê ImageStreams
+```
+
+> Nói ngắn gọn:
+- oc get/describe/logs/exec → Quan sát resource.
+- oc new-app/apply/delete → Tạo và xóa resource.
+- oc expose → Mở service ra ngoài bằng Route.
+- oc scale/rollout → Triển khai và quản lý app.
+
+| Kubernetes | OpenShift |
+| --- | --- |
+| Namespace                           | Project                                  |
+| Chỉ là logical group resource       | Namespace + quyền, quota, network policy |
+| Tạo bằng `kubectl create namespace` | Tạo bằng `oc new-project`                |
+| RBAC phải tự cấu hình               | Tự gán quyền cho user tạo project        |
+| Thuần resource grouping             | Enterprise-ready, phục vụ multi-tenancy  |
 
