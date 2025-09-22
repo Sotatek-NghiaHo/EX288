@@ -656,5 +656,789 @@ CMD npm start
 ```
 -> rebuild image, run -rm , podman push -> oc new-app -> expose > get url
 
+## Using External Registries in Red Hat OpenShift
+There are many kinds of container registries:
+
+**Public registries**  
+Registries that allow anyone to consume container images directly from the internet without any authentication, such as Docker Hub, Quay.io, or the Red Hat Registry.
+
+**Private registries**  
+Registries that are available only to selected consumers and usually require authentication. The Red Hat terms-based registry is an example of a private container registry.
+
+**Enterprise registries**  
+Registries that your organization manages. Such registries are usually available only to the organization's employees.
+
+**OpenShift internal registries**  
+A registry server managed internally by an OpenShift cluster to store container images.
+
+These kinds of registries are not mutually exclusive: a registry can be, at the same time, both public and private.
+
+**Creating Registry Credentials in OpenShift**  
+1. You can use the oc create command to create a secret, for example:
+```
+[user@host ~]$ oc create secret generic example-secret \
+--from-literal=user=developer --namespace=example-ns
+secret/example-secret created
+```
+2. You can use the OpenShift console to create secrets. In the Developer perspective, click Secrets. Select a project, click Create, and then select the secret type that you want to create.
+
+![alt text](pic/17.png)
+
+3. Kubernetes provides the docker-registry secret type to store credentials for authentication with the container registry.
+
+```bash
+[user@host ~]$ oc create secret docker-registry SECRET_NAME \
+--docker-server REGISTRY_URL \
+--docker-username USER \
+--docker-password PASSWORD \
+--docker-email=EMAIL
+secret/SECRET_NAME created
+```
+4. Tạo trực tiếp trong Web Console (GUI)
+- Vào Workloads → Secrets → Create → Image pull secret.
+- Nhập server URL, user, password, email.
+
+![alt text](pic/16.png)
+
+You can also create the secret from existing credentials. For example, if you logged in to the private registry with Podman, then you have existing credentials in the `${XDG_RUNTIME_DIR}/containers/auth.json` file. Because the auth.json file uses the same structure as the .dockerconfigjson file, you can create the secret by using the `auth.json` file.
+```
+[user@host ~]$ oc create secret generic SECRET_NAME \
+--from-file .dockerconfigjson=${XDG_RUNTIME_DIR}/containers/auth.json \
+--type kubernetes.io/dockerconfigjson
+```
+You can also upload the auth.json file in the OpenShift console when creating the secret.
+
+**Configuring OpenShift to Use the Registry Credentials**  
+You can configure OpenShift to use custom credentials by using the `spec.imagePullSecrets` Pod property, for example:
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+spec:
+  containers:
+  - name: example-container
+    image: REGISTRY_URL
+  imagePullSecrets:
+  - name: SECRET_NAME
+```
+Consequently, you can use the property for controllers, such as the Deployment objects:
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: example-container
+          image: REGISTRY_URL
+      imagePullSecrets:
+        - name: SECRET_NAME
+```
+
+**Linking Registry Credentials to Service Accounts**
+
+Instead of manually assigning the credentials to pods, you can configure OpenShift to assign the credentials to pods automatically by using service accounts. A service account provides an identity for pods. Pods use the default service account unless you configure a different service account.
+
+Use the oc secrets link command to connect a secret with a service account, for example:
+```
+[user@host ~]$ oc secrets link --for=pull default SECRET_NAME
+no output expected
+```
+Hoặc cho build config:
+```
+oc secrets link builder my-registry-secret --for=pull
+```
+The preceding command creates a new entry in the service account imagePullSecrets field:
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+imagePullSecrets:
+- name: SECRET_NAME
+```
+When you create a pod that uses the default service account, it inherits the imagePullSecrets field without you explicitly specifying the field in the pod definition.
+
+This means that every pod that uses the default service account is authorized with the registry credentials in your secret.  
+Giai thich:
+- Bạn đã tạo secret trước đó (chứa thông tin registry account).
+- Câu lệnh này sẽ gắn secret vào ServiceAccount default của project hiện tại.
+- Kể từ lúc đó, bất kỳ Pod nào trong project chạy với SA default sẽ tự động dùng secret này khi pull image từ registry private.
+
+-> 2 cách chính để sử dụng secret đó trong OpenShift/Kubernetes:
+- Cách 1: Khai báo trực tiếp trong workload (spec.imagePullSecrets)
+- Cách 2: Gắn secret vào ServiceAccount (oc secrets link)
+
+Nguyên tắc
+- Secret là resource “namespace-scoped” → chỉ tồn tại trong project (namespace) nào nó được tạo.
+- Do đó:
+  - Secret trong project A không thể dùng trực tiếp ở project B.
+  - Nếu project B cũng cần dùng → bạn phải tạo lại secret trong project B (có thể cùng thông tin).
+
+Có thể dung ServiceAccount khác thay vì default
+```
+oc secrets link custom-sa my-registry-secret --for=pull
+
+# 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      serviceAccountName: custom-sa   # dùng SA này thay vì default
+      containers:
+      - name: myapp
+        image: quay.io/myuser/private-app:1.0
+
+```
+
+*Search for the failed event messages that the application emits.*
+```
+[student@workstation ~]$ oc get event --field-selector type=Warning \
+-o jsonpath='{range .items[]}{.message}{"\n"}{end}'
+Failed to pull image "registry.ocp4.example.com:8443/redhattraining/hello-world-nginx:latest": ... invalid username/password: unauthorized: ...
+```
+
+![alt text](pic/18.png)
+
+Docs: https://docs.redhat.com/en/documentation/openshift_container_platform/4.8/html/authentication_and_authorization/understanding-and-creating-service-accounts
+
+
+Fix error  "Robot Accounts"
+
+![alt text](pic/19.png)
+
+7. Delete the robot account from the internal registry.
+
+On the Robot Accounts page, click the gear icon of the developer+ocprobot account, and then click Delete Robot developer+ocprobot. Click Ok to complete the process.
+
+## 3.5 Creating Image Streams
+Image streams have the following benefits:
+- They provide a level of indirection to the container image that OpenShift runs.
+- They allow for rolling back to a previous container version without updating the image registry.
+- They enable build and deployment automations when an image stream tag gets updated.
+- They enable the caching of images from external image registries.
+- You can use role-based access control (RBAC) on the image stream object to secure access to container images.
+
+Vấn đề: mỗi lần đổi image → bạn phải can thiệp thủ công.
+Trong khi đó, nếu dùng ImageStream + ImageChange trigger thì chỉ cần cập nhật oc tag hoặc build mới   
+→ OpenShift tự rollout cho bạn.
+
+
+![alt text](pic/20.png)
+
+![alt text](pic/21.png)
+
+**Managing Image Streams and Tags**
+
+For example, the following command imports a my-app-stream container image from an external container registry and periodically checks for updates:
+```
+[user@host ~]$ oc import-image myimagestream --confirm --scheduled=true \
+--from example.com/example-repo/my-app-image
+```
+To create one image stream tag resource for each container image tag that exists in the source registry server, add the --all option to the oc import-image command. The following command creates or updates all image stream tags for new tags on the source registry server:
+```
+[user@host ~]$ oc import-image myimagestream --confirm --all \
+--from registry/myorg/myimage
+```
+Running the oc import-image command on an existing image stream updates one of its current image stream tags to the current image IDs on the source registry server, such as in the following command:
+```
+[user@host ~]$ oc import-image myimagestream[:tag]
+```
+Exert finer control over an image stream tag by using the oc tag command. This enables you to associate an image stream tag with the following:
+- A different registry than the one in its image stream
+- A different container image name and tag
+- An image ID that might not be the one currently associated with the image tag on the registry server
+- An alias for the image stream tag
+
+For example, to update the latest image stream tag to point to a different tag you can run the following command:
+```
+[user@host ~]$ oc tag myimagestream:tag myimagestream:latest
+```
+**Creating Image Streams From Private Registries**  
+The following example commands use Podman to log in to a private registry, create a secret to store the access token, and create an image stream that points to the private registry:
+```
+[user@host ~]$ podman login -u myuser registry.example.com
+[user@host ~]$ oc create secret generic regtoken \
+--from-file .dockerconfigjson=${XDG_RUNTIME_DIR}/containers/auth.json \
+--type kubernetes.io/dockerconfigjson
+[user@host ~]$ oc import-image myimagestream --confirm \
+--from registry.example.com/myorg/myimage
+```
+After you create an image stream, you can use it to deploy an application by using the oc new-app command and by using the `-i` option to specify the image stream.
+
+By default, an image stream resource is only available to create applications or builds in the same project.
+
+**Using Image Streams with Kubernetes Resources**
+
+**Sharing an Image Stream Between Multiple Projects**
+
+📌 1. Tạo và quản lý ImageStream
+
+Tạo IS rỗng:
+```
+oc create is myapp
+```
+
+Xem danh sách IS trong project:
+```
+oc get is
+```
+
+Xem chi tiết 1 IS:
+```
+oc describe is myapp
+```
+
+Xoá IS:
+```
+oc delete is myapp
+```
+📌 2. Import image từ registry vào IS
+
+Import một image cụ thể:
+```
+oc import-image myapp:1.0 --from=quay.io/example/myapp:1.0 --confirm
+```
+
+Import tất cả tag từ một repo:
+```
+oc import-image myapp --from=quay.io/example/myapp --all --confirm
+```
+
+Import có lịch trình (scheduled):
+```
+oc import-image myapp --from=quay.io/example/myapp --confirm --scheduled=true
+```
+
+Cập nhật tag hiện có:
+```
+oc import-image myapp:latest
+```
+📌 3. Quản lý tag của IS
+
+Tạo alias giữa các tag:
+```
+oc tag myapp:1.0 myapp:latest
+```
+
+Copy từ IS khác:
+```
+oc tag otheris:2.0 myapp:dev
+```
+
+Gán IS tag với image ngoài registry:
+```
+oc tag quay.io/example/myapp:3.0 myapp:stable
+```
+📌 4. Liên quan tới ứng dụng
+
+Dùng IS để tạo app (DeploymentConfig):
+```
+oc new-app -i myapp:latest --name=myapp
+```
+
+Xem Pod nào đang dùng IS:
+```
+oc describe is myapp
+```
+
+(phần “Image Stream Tag History” sẽ show DeploymentConfig, Builds nào đang dùng tag đó).
+
+📌 5. BuildConfig và IS
+
+Build output về IS:
+```
+oc new-build --binary --name=myapp --to=myapp:1.0
+oc start-build myapp --from-dir=. --follow
+```
+
+👉 Tóm gọn:
+
+- oc create is / oc delete is → quản lý ImageStream.
+- oc import-image → kéo image từ registry vào IS.
+- oc tag → quản lý tag trong IS.
+- oc new-app -i → deploy app từ IS (DeploymentConfig + trigger).
+- oc describe is → theo dõi ai đang dùng IS.
+
+---
+# Chapter 4.  Managing Red Hat OpenShift Builds
+🔹 OpenShift Build Process (Cách OpenShift build image)
+1. Các thành phần chính khi build
+
+- Trigger → cái gì khởi chạy build (git commit, webhook, thay đổi image).
+- Strategy → build theo cách nào (Source-to-Image (S2I), Dockerfile/Buildah, Custom).
+- Input sources → code, binary, hoặc Dockerfile.
+- Output → image được push vào registry.
+
+👉 OpenShift cung cấp 2 cách build chính:
+
+- BuildConfig (cổ điển): tài nguyên gốc của OpenShift, khai báo YAML rồi build.
+- Shipwright (mới, Kubernetes-native): dựa trên upstream project, linh hoạt, hỗ trợ nhiều tool (S2I, Buildah, Buildpacks).
+
+2. Shipwright (Builds for OpenShift)
+- Kubernetes-native: dùng CRD như các resource khác.
+- Linh hoạt: hỗ trợ nhiều chiến lược build.
+- Dễ dùng: có CLI shp, tích hợp trong Web Console.
+
+Các CR quan trọng:
+- Build: định nghĩa cái gì cần build (nguồn code, chiến lược, output image).
+- BuildStrategy / ClusterBuildStrategy: mô tả cách build (ví dụ S2I, Buildah, Buildpacks).
+- BuildRun: khi chạy build, sẽ tạo ra một Pod thực hiện build.
+
+3. Ví dụ với Buildah
+
+Build resource (khai báo build):
+```bash
+apiVersion: shipwright.io/v1beta1
+kind: Build
+metadata:
+  name: buildah-golang-build
+spec:
+  source:                 # code nguồn
+    type: Git
+    git:
+      url: https://github.com/shipwright-io/sample-go
+    contextDir: docker-build
+  strategy:               # chiến lược build
+    name: buildah
+    kind: ClusterBuildStrategy
+  paramValues:            # tham số build
+  - name: dockerfile
+    value: Dockerfile
+  output:                 # image output
+    image: image-registry.openshift-image-registry.svc:5000/buildah-example/sample-go-app
+```
+
+👉 Giải thích:
+- source: lấy code từ GitHub.
+- strategy: dùng Buildah.
+- paramValues: chỉ ra Dockerfile.
+- output: image sẽ được push vào internal registry.
+
+BuildRun resource (chạy build):
+```bash
+apiVersion: shipwright.io/v1beta1
+kind: BuildRun
+metadata:
+  name: buildah-golang-buildrun
+spec:
+  build:
+    name: buildah-golang-build
+```
+
+👉 BuildRun chỉ cần tham chiếu đến Build đã định nghĩa → Shipwright tạo Pod để build.
+
+4. CLI shp (thay cho YAML dài dòng)
+
+Tạo Build:
+```bash
+shp build create buildah-golang-build \
+  --source-url="https://github.com/redhat-openshift-builds/samples" \
+  --source-context-dir="buildah-build" \
+  --strategy-name="buildah" \
+  --dockerfile="Dockerfile" \
+  --output-image="image-registry.openshift-image-registry.svc:5000/buildah-example/go-app"
+```
+
+Chạy build:
+```
+shp build run buildah-golang-build --follow
+```
+✅ Tóm tắt 
+
+- BuildConfig: kiểu cũ, thuần OpenShift.
+- Shipwright (Builds for OpenShift): kiểu mới, Kubernetes-native, linh hoạt hơn.
+- Build = định nghĩa build, BuildStrategy = cách build, BuildRun = chạy build.
+- Ví dụ: lấy code từ GitHub → dùng Buildah với Dockerfile → output thành image trong registry.
+
+**Builds using BuildConfig**
+
+![alt text](pic/22.png)
+
+**The S2I Build Workflow**
+
+![alt text](pic/23.png)
+
+✅ Tóm tắt
+
+- Builder image: image đặc biệt để build app từ source → output image.
+- S2I scripts: assemble (cách build), run (cách chạy).
+- Có 2 cách dùng:
+  - Tạo builder image chứa sẵn script.
+  - Override bằng .s2i/bin/ trong repo → nhanh hơn, không cần rebuild builder image.
+
+## 4.3 Managing Application Builds
+Create a Build Configuration
+There are two ways to create a build configuration using the oc CLI: `oc new-app` and `oc new-build`.
+
+
+
+
+## 4.5 Triggering Builds
+
+## 4.7 Customizing an Existing S2I Base Image
+
+---
+# Chapter 5.  Managing Red Hat OpenShift Deployments
+
+1. Khái niệm chung
+- Deployment trong OpenShift tự động hóa quá trình cập nhật ứng dụng.
+- Mục tiêu: giảm downtime, tăng tính ổn định, hỗ trợ phát hành liên tục.
+- Yêu cầu app cần tuân thủ best practices:
+  - Xử lý tín hiệu SIGTERM để tắt graceful.
+  - Health/Readiness probe để router chỉ gửi request đến pod khỏe.
+
+2. Deployment Resource
+- Là Kubernetes-native (dùng ReplicaSet).
+- Tính năng: rollout theo config, scale, pause/resume rollout.
+- DeploymentConfig (kiểu cũ) đã bị deprecated.
+
+3. Chiến lược Deployment
+- Có 2 nhóm:  
+a. Dựa trên Deployment Resource
+- Rolling (RollingUpdate)
+  - Mặc định.
+  - Từng bước thay pod cũ bằng pod mới.
+  - Không downtime.
+  - Dùng khi app chạy song song được nhiều version.
+- Recreate
+  - Xóa toàn bộ pod cũ → chạy pod mới.
+  - Có downtime.
+  - Dùng khi app không hỗ trợ chạy song song, hoặc sử dụng PVC với RWO / RWOP.
+
+b. Dựa trên Router
+
+1. Blue-Green
+  - 2 môi trường (Blue – mới, Green – cũ) chạy song song.
+  - Route trỏ vào version nào thì user dùng version đó.
+  - Dễ rollback.
+
+2. A/B
+- Route chia traffic theo tỷ lệ (ví dụ 10% Blue, 90% Green).
+- Dùng để test dần, tăng traffic từ từ cho version mới.
+
+## 5.3 Managing Application Deployments
+`oc rollout`  
+The oc rollout command provides the cancel, pause, undo, retry, and more options for your deployments.
+1. Xem trạng thái rollout
+```
+oc rollout status deployment example-deployment
+```
+- Dùng để theo dõi tiến trình triển khai (xem pod cũ đã xoá chưa, pod mới đã chạy chưa).
+- Kết quả ví dụ:
+  - Waiting for deployment ... rollout to finish... → đang triển khai.
+  - successfully rolled out → triển khai thành công.
+
+2. Rollback (quay lại version trước)
+```
+oc rollout undo deployment example-deployment
+```
+- Nếu version mới bị lỗi, quay lại version cũ ngay.
+- Giống như Ctrl+Z cho Deployment 😄.
+
+3. Pause (tạm dừng rollout)
+```
+oc rollout pause deployment example-deployment
+```
+- Dùng khi bạn muốn tạm dừng triển khai tự động (ví dụ: bạn đang sửa nhiều config).
+- Lúc này thay đổi không áp dụng ngay.
+
+4. Resume (tiếp tục rollout)
+```
+oc rollout resume deployment example-deployment
+```
+- Sau khi chỉnh sửa xong, dùng lệnh này để cho rollout tiếp tục.
+
+`oc scale`  
+The oc scale command scales the number of replicas for a given deployment:
+```
+[user@host ~]$ oc scale deployment example-deployment --replicas=3
+deployment.apps/example-deployment scaled
+```
+
+**Create Secrets and Configuration Maps**
+Similarly to secrets, you can create configuration maps by using the oc create command:
+```
+[user@host ~]$ oc create configmap example-cm \
+--from-literal key1=value1 \
+--from-literal key2=value2
+configmap/example-cm created
+```
+The previous command creates the following YAML object:
+```
+kind: ConfigMap
+metadata:
+    name: example-cm
+apiVersion: v1
+data:
+    key1: value1
+    key2: value2
+```
+You can also create configuration maps from a file or a directory:
+```
+[user@host ~]$ oc create configmap example-cm \
+--from-file=redis.conf
+configmap/example-cm created
+```
+The preceding example creates a configuration map with the redis.conf key and the contents of the file as its value. Developers might also rename the key, such as:
+```bash
+[user@host ~]$ oc create configmap example-cm \
+--from-file=primary=/etc/redis/redis.conf \
+--from-file=replica=replica-redis.conf
+configmap/example-cm created
+```
+The preceding example creates a configuration map with the following keys:
+- The primary key with the contents of the local /etc/redis/redis.conf file.
+- The replica key with the contents of the local ./replica-redis.conf file.
+
+Finally, similarly to secrets, you can use the OpenShift web console to create configuration maps. In the developer perspective, click ConfigMaps, select your project, and click Create ConfigMap.
+
+**Manage Secrets and Configuration Maps**  
+*View resources*  
+To view details of a resource, use the oc get command:
+```
+[user@host ~]$ oc get secret mysecret -o yaml
+...output omitted...
+```
+The -o yaml parameter displays the resource in the YAML language  
+*Edit resources*  
+To edit a resource, use the oc edit command:
+```
+[user@host ~]$ oc edit configmap my-cm
+...output omitted...
+```
+Alternatively, you can edit resources in the OpenShift web console.  
+
+*Patch resources*  
+Patching a resource refers to updating the resource by applying a set of changes rather than interactively. This is useful, for example, in scripts. Use the oc patch command to patch a resource, for example:
+```
+[user@host ~]$ oc patch configmap/my-cm \
+--patch '{"data":{"key1":"newvalue1"}}'
+configmap/my-cm patched
+```
+The preceding command changes the .data.key1 key to the newvalue1 value.
+
+The preceding commands work on any OpenShift resource. However, to edit secrets, you must use values in base64 encoding. You can encode any string by using the base64 command, for example:
+```bash
+[user@host ~]$ echo -n 'hunter3' | base64
+aHVudGVyMw==
+
+# decode
+[user@host ~]$ echo -n 'aHVudGVyMw==' | base64 --decode
+hunter3
+```
+*Inject Data to Pods*  
+You can mount configuration maps and secrets as data volumes or expose the data as environment variables, inside an application container.
+
+Có 2 cách để đưa dữ liệu từ ConfigMap hoặc Secret vào trong Pod:
+- Inject thành biến môi trường (env).
+- Mount thành file trong container.
+
+1. Inject ConfigMap/Secret thành Environment Variables
+
+Ví dụ lệnh:
+```
+oc set env deployment my-deployment --from configmap/my-cm
+```
+- Ý nghĩa: Lấy tất cả key/value trong ConfigMap my-cm → inject vào Deployment my-deployment → thành biến môi trường trong container.
+- Kết quả trong pod:
+```
+env:
+  - name: KEY1
+    valueFrom:
+      configMapKeyRef:
+        key: key1
+        name: my-cm
+```
+- Dùng khi app đọc config từ ENV.
+
+2. Mount ConfigMap/Secret thành Volume (file trong container)
+
+Ví dụ lệnh:
+```
+oc set volume deployment my-deployment --add \
+-t secret -m /mnt/secret \
+--name myvol --secret-name my-secret
+```
+
+Ý nghĩa: Mount Secret my-secret vào Deployment my-deployment, gắn tại /mnt/secret.
+
+Kết quả trong pod:
+```
+volumeMounts:
+- mountPath: /mnt/secret
+  name: myvol
+volumes:
+- name: myvol
+  secret:
+    secretName: my-secret
+```
+
+Dùng khi app cần file (ví dụ: username.txt, password.txt, TLS cert…).
+
+3. Lưu ý quan trọng
+- ConfigMap/Secret chỉ dùng trong cùng namespace (không share giữa project).
+- Nếu bạn cập nhật ConfigMap/Secret, pod đang chạy không tự động nhận giá trị mới.
+  - Bạn phải xóa pod hoặc rollout lại deployment để pod mới nhận giá trị update. Update config thì cần tái tạo pod để áp dụng giá trị mới.
+
+1. Service Account (SA) là gì?
+- Là identity (danh tính) cho ứng dụng trong OpenShift.
+- Có thể gắn quyền RBAC, secrets, SCC (Security Context Constraints)… vào SA.
+- Mặc định, mọi pod dùng default service account trong namespace.
+- Mỗi SA có một JWT token được mount vào pod tại:
+```
+/var/run/secrets/kubernetes.io/serviceaccount
+```
+
+→ Pod có thể dùng token này để gọi OpenShift API.
+
+2. Tạo và gán Service Account
+- Tạo SA:
+```
+oc create serviceaccount my-sa
+```
+- Gán SA cho deployment:
+```
+oc set serviceaccount deployment nginx-deployment my-sa
+```
+Kết quả: deployment nginx-deployment sẽ chạy pod với SA my-sa.
+
+👉 Dùng khi app cần quyền đặc biệt (ví dụ: CI/CD pipeline hoặc operator gọi API OpenShift).
+
+3. Security Context & SCC
+a. Security Context
+- Xác định quyền, UID, GID, capabilities mà container được phép.
+- Ví dụ: chạy non-root, cấm privilege escalation.
+
+b. SCC (Security Context Constraints)
+- Là policy bảo mật riêng của OpenShift.
+- Tự động áp dụng security context cho pod.
+- Mặc định, pod thường dùng SCC restricted-v2.
+
+👉 Admin có thể gắn SCC vào SA → Pod nào chạy với SA đó sẽ được áp dụng SCC tương ứng.
+
+4. Ví dụ Deployment với Security Context
+```
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+    - ALL
+```
+- runAsNonRoot: true → cấm chạy user root.
+- allowPrivilegeEscalation: false → không cho container tăng quyền.
+- capabilities.drop: ALL → bỏ hết Linux capabilities.
+- seccompProfile: RuntimeDefault → dùng cấu hình bảo mật mặc định của runtime.
+
+5. Lưu ý quan trọng
+- SA + SCC quyết định pod được phép làm gì.
+- Nếu không chỉ định → OpenShift sẽ áp dụng mặc định (restricted-v2).
+- Để chạy pod đặc biệt (ví dụ cần quyền hostPath, privileged) → cần gán SCC phù hợp cho SA.
+
+## 5.5 Deploying Stateful Applications
+
+**Persistent Volumes and Persistent Volume Claims**  
+*Persistent Volumes*  
+![alt text](pic/24.png)
+
+*Persistent Volume Claims*  
+Persistent volume claims (PVCs) represent a request for a persistent volume. These requests can include requirements for the PV, such as the following attributes:
+- Amount of storage
+- Label selector
+- Volume mode
+- Access mode
+- Storage class
+
+![alt text](pic/25.png)
+
+**Static and Dynamic Provisioning**
+
+1. Static Provisioning
+- Admin tạo PV thủ công trước → Developer chỉ tạo PVC để claim vào PV đã có.
+- Nhược điểm:
+  - Tốn công quản lý (Admin phải đoán trước dung lượng).
+  - Dễ lãng phí nếu PV không được dùng.
+- Dùng khi storage backend không hỗ trợ dynamic hoặc môi trường lab/test.
+
+2. Dynamic Provisioning
+
+- Developer chỉ cần tạo PVC.
+- Cluster sẽ tự động tạo PV mới phù hợp nhờ StorageClass (SC).
+- Điều kiện:
+  - Admin phải cấu hình StorageClass với một Provisioner plugin (ví dụ: nfs-subdir-external-provisioner, Ceph, EBS, v.v.).
+  - Nếu default SC chưa định nghĩa, PVC phải chỉ rõ storageClassName.
+
+3. StorageClass (SC)
+- Là “profile” của storage: định nghĩa loại storage, tốc độ, reclaim policy,…
+- Ví dụ SC:
+```
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+```
+- provisioner: plugin lo việc cấp phát storage.
+- reclaimPolicy: Delete (xoá PV khi xoá PVC) hoặc Retain (giữ lại PV).
+- is-default-class: "true" → PVC nào không ghi storageClassName thì mặc định dùng SC này.
+
+4. PVC với Dynamic Provisioning
+
+Ví dụ:
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-volume-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs-storage
+```
+- Khi tạo PVC này → SC nfs-storage sẽ tạo ra một PV mới tự động → PVC được bind.
+- Admin không cần tạo PV thủ công.
+
+So sánh
+| Đặc điểm    | Static Provisioning   | Dynamic Provisioning            |
+| ----------- | --------------------- | ------------------------------- |
+| Ai tạo PV   | Admin                 | Tự động (qua StorageClass)      |
+| Ai tạo PVC  | Developer             | Developer                       |
+| Linh hoạt   | Kém                   | Cao                             |
+| Thường dùng | Test, storage cố định | Production, CI/CD, Cloud-native |
+
+
+
+
+
 
 
