@@ -1953,6 +1953,42 @@ To start a pipeline or a task, you can use the tkn CLI or the Pipelines section 
 
 ![alt text](pic/44.png)
 
+Default Tasks
+
+```
+[user@host ~]$ oc get task/buildah \
+-n openshift-pipelines \
+-o yaml
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah
+```
+
+Alternatively, you can use the Tekton CLI (tkn). The following example command shows metadata about the same buildah task.
+```
+[user@host ~]$ tkn -n openshift-pipelines t describe buildah
+Name:          buildah
+Namespace:     openshift-pipelines
+Description:   Buildah task builds source into a container image and
+then pushes it to a container registry.
+...output omitted...
+
+Params
+```
+
+![alt text](pic/45.png)
+
+![alt text](pic/46.png)
+
+
+
+
+
+
+
+
+
 
 
 
