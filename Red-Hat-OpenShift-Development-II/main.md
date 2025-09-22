@@ -1436,7 +1436,522 @@ So sánh
 | Linh hoạt   | Kém                   | Cao                             |
 | Thường dùng | Test, storage cố định | Production, CI/CD, Cloud-native |
 
+**Mounting Claims Within Pods**
 
+Mount PVC vào Pod
+
+![alt text](pic/26.png)
+
+Mount PVC vào Deployment
+
+![alt text](pic/27.png)
+
+Kết quả: Deployment YAML được cập nhật thêm:
+```bash
+volumeMounts:
+- mountPath: /tmp/data
+  name: nfs-volume-storage
+
+volumes:
+- name: nfs-volume-storage
+  persistentVolumeClaim:
+    claimName: my-data-claim
+```
+3. Lưu ý khi dùng PVC trong Deployment
+- Tất cả pod replica trong Deployment đều mount cùng PVC → có thể gây conflict nếu ứng dụng không hỗ trợ shared storage.
+- Với database (MySQL, PostgreSQL, MongoDB, …):
+  - Mỗi instance thường cần storage riêng.
+  - Replication/sharding do chính database quản lý, không dùng chung PVC.
+- Với stateless app (web server, API, …): thường không cần PVC → dễ scale hơn.
+
+4. Ephemeral Storage (tạm thời)
+
+- Dùng volume để inject file có sẵn mà không cần rebuild image.
+- Ví dụ:
+  - Script init database.
+  - Config server.
+  - TLS cert/token/key.
+- ConfigMap & Secret cũng có thể mount dưới dạng volume → rất phổ biến.
+- Dữ liệu ephemeral sẽ mất khi pod bị xoá (không persistent).
+
+**Stateful Sets**
+
+As their name suggests, stateful sets are intended for stateful applications. Unlike deployments, pods within stateful sets are guaranteed to have a predictable identifier (ID) for each pod. For example, three replicas for the redis stateful set might use the redis-0, redis-1, and redis-2 pod names. This is useful for routing requests to each pod or discovering new pods that must join to an existing cluster. In addition, each replica pod created by a stateful set can have a dedicated PVC.
+
+![alt text](pic/28.png)
+1. Bình thường (Service có ClusterIP)
+- Khi bạn tạo Service bình thường (ClusterIP ≠ None), Kubernetes/OpenShift sẽ load balance traffic đến bất kỳ Pod nào match label selector.
+- Các Pod trong Deployment thường giống hệt nhau, nên việc “gửi vào Pod nào cũng được” → không vấn đề.
+
+2. Headless Service (ClusterIP = None)
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-stateful-app
+spec:
+  clusterIP: None
+  selector:
+    app: my-stateful-app
+```
+- clusterIP: None → Service không có IP riêng, không làm load balancing.
+- Thay vào đó, mỗi Pod trong StatefulSet có DNS riêng.
+- Ví dụ StatefulSet tạo 3 replica:
+```
+my-stateful-app-0.my-stateful-app
+
+my-stateful-app-1.my-stateful-app
+
+my-stateful-app-2.my-stateful-app
+```
+Mỗi Pod có địa chỉ riêng, có thể gọi trực tiếp.
+
+## Monitoring Application Health
+
+*Specifying Application Resource Requirements*
+
+![alt text](image.png)
+
+**Types of Probes**  
+1. Startup Probe
+- Kiểm tra: ứng dụng trong container đã khởi động thành công chưa.
+- Chỉ chạy lúc startup, 1 lần cho đến khi thành công → sau đó mới kích hoạt các probe khác.
+- Nếu fail → container bị kill và restart (theo restartPolicy).
+- Dùng khi: ứng dụng khởi động lâu (VD: Java app, DB server…).
+
+👉 Cấu hình: spec.containers.startupProbe
+
+2. Readiness Probe
+
+- Kiểm tra: container có sẵn sàng nhận traffic chưa.
+- Nếu fail → Pod bị loại khỏi Service endpoint, không nhận request cho đến khi pass.
+- Dùng khi: ứng dụng cần làm việc chuẩn bị (mở kết nối DB, load config/cache).
+- Không kill container, chỉ “đứng ngoài load balancer”.
+
+👉 Cấu hình: spec.containers.readinessProbe
+
+3. Liveness Probe
+- Kiểm tra: ứng dụng trong container còn chạy khỏe mạnh không.
+- Nếu fail → OpenShift/K8s sẽ restart container.
+- Dùng khi: ứng dụng có thể bị treo (deadlock, memory leak).
+
+👉 Cấu hình: spec.containers.livenessProbe
+
+![alt text](pic/30.png)
+
+**Methods of Checking Application Health**  
+Startup, readiness, and liveness probes can verify that an application is in a healthy state in the following three ways:
+- HTTP checks
+- Container execution checks
+- TCP socket checks
+
+HTTP Checks
+![alt text](pic/31.png)
+
+Container Execution Checks
+
+![alt text](pic/32.png)
+
+TCP Socket Checks
+
+![alt text](pic/33.png)
+
+**Managing Probes**  
+Developers can create and manage probes with either the oc CLI client or the OpenShift web console.
+
+![alt text](pic/34.png)
+
+![alt text](pic/35.png)
+
+**Probes Via the CLI**  
+The oc set probe command creates probes on existing workloads.
+```
+[user@host ~]$ oc set probe deployment/myapp \
+--readiness \
+--get-url=http://:8080/readyz \
+--period-seconds=20
+```
+```
+[user@host ~]$ oc set probe deployment/myapp \
+--liveness \
+--open-tcp=3306 \
+--period-seconds=20 \
+--timeout-seconds=1
+```
+```
+[user@host ~]$ oc set probe deployment/myapp \
+--liveness \
+--get-url=http://:8080/livez \
+--initial-delay-seconds=30 \
+--success-threshold=1 \
+--failure-threshold=3
+```
+Use the oc set probe --help command to view the available options.
+
+**Automatically Scaling Applications**   
+Horizontal Scaling
+
+![alt text](pic/36.png)
+
+Vertical Scaling
+
+
+---
+# Chapter 6.  Deploying Multi-container Applications
+
+🎯 OpenShift Template dùng để làm gì?
+- Đóng gói nhiều resource lại thành 1 gói → dễ triển khai.
+Ví dụ: Deployment + Service + Route + PVC → gom chung vào 1 file Template.
+- Dùng tham số (parameters) → linh hoạt khi deploy.
+Ví dụ: thay đổi tên app, image, số replicas, hoặc kích thước storage mà không cần sửa tay nhiều chỗ trong YAML.
+- Tự động hóa và tái sử dụng → QA, Dev, Ops chỉ cần 1 lệnh oc new-app -f template.yaml -p PARAM=VALUE là deploy ra nguyên cụm app.
+- Dùng cho môi trường multi-tier (web + app + DB) → deploy nhanh cả hệ thống thay vì từng bước.
+- ISV (nhà cung cấp phần mềm) hay dùng template để ship sản phẩm → khách hàng chỉ cần chạy template là có đủ các thành phần.
+
+![alt text](pic/37.png)
+
+**Creating an Application from a Template**  
+You can deploy an application directly from a template definition file. The oc new-app and oc process commands can use a template as an input and process this file to create resources.
+
+The oc new-app command can process a template file to create resources in OpenShift, as follows:
+```
+[user@host ~]$ oc new-app --file mytemplate.yaml -p PARAM1=value1 \
+-p PARAM2=value2
+```
+You can also use a template stored in the cluster. This example processes a template called mysql-persistent:
+```
+[user@host ~]$ oc new-app --template mysql-persistent \
+-p MYSQL_USER=student -p MYSQL_PASSWORD=mypass
+```
+The oc process command processes a template and produces a resource list. You can save the resource list to a local file as follows:
+```
+[user@host ~]$ oc process -f mytemplate.yaml -p PARAM1=value1 \
+-p PARAM2=value2 > myresourcelist.json
+```
+Note
+You can modify the output format, which is JSON by default, by using the --output (-o) option.
+
+## 6.3 Install Applications by Using Helm Charts
+
+![alt text](pic/38.png)
+
+**Deploy Charts with Web Console**
+
+**Manage Charts with Helm CLI**
+```
+[user@host ~]$ helm repo add openshift-helm-charts \
+https://charts.openshift.io/
+"openshift-helm-charts" has been added to your repositories
+```
+When you add a private registry, you can define the credentials when adding the repository, for example by using the `--username` and `--password` flags.
+
+You can search the contents of the repository:
+```
+[user@host ~]$ helm search repo openshift-helm-charts
+NAME                                              	CHART VERSION	APP VERSION 	DESCRIPTION
+openshift-helm-charts/a10tkc                      	0.2.0        	1.16.0        A Helm chart for A10 Thunder Kubernetes Connector
+openshift-helm-charts/akeyless-api-gateway        	1.41.2       	4.4.1         A Helm chart for Kubernetes that deploys akeyle...
+openshift-helm-charts/alaz                        	0.5.0        	v0.5.2        Alaz is an open-source Ddosify eBPF agent that ...
+...output omitted...
+```
+
+Use the `helm pull` command to download a helm chart.
+```
+[user@host ~]$ helm pull openshift-helm-charts/redhat-quarkus \
+--untar --destination redhat-quarkus
+...no output expected...
+```
+
+To upload your charts, use the helm package command to create a chart tar file.
+```
+[user@host ~]$ helm package my-chart-directory
+Successfully packaged chart and saved it to: /home/user/example-chart-0.1.0.tgz
+```
+Then, use the helm push command to upload the packaged helm chart to your repository.
+```
+[user@host ~]$ helm push example-chart-0.1.0.tgz example.repository.org
+...output omitted...
+```
+Finally, use the helm install command to install a remote or local chart.
+```
+[user@host ~]$ helm install my-quarkus-application \
+openshift-helm-charts/redhat-quarkus \
+--set replicaCount=3,image.tag=latest
+...output omitted...
+Your Quarkus app is building! To view the build logs, run:
+
+oc logs bc/my-quarkus-application --follow
+...output omitted...
+```
+
+So sanh
+| Lệnh | Mục đích |
+| --- | --- |
+| `helm pull`    | Chỉ **tải chart** về local, chưa cài gì lên cluster.   |
+| `helm install` | **Triển khai chart** thành ứng dụng thật trên cluster. |
+
+You can view Helm releases, or applications that you installed by using Helm charts:
+```
+[user@host ~]$ helm ls
+NAME                  	NAMESPACE  REVISION	UPDATED   STATUS  	CHART
+my-quarkus-application	test	     1       	2022-...	deployed	quarkus-0.0.3
+vertx-app             	test	     1       	2023-...	deployed	ver
+```
+When the chart developer releases an updated chart, you can update your release:
+```
+[user@host ~]$ helm upgrade my-quarkus-application \
+openshift-helm-charts/redhat-quarkus
+Release "my-quarkus-application" has been upgraded. Happy Helming!
+NAME: my-quarkus-application
+LAST DEPLOYED: Thu Aug 17 08:37:07 2023
+NAMESPACE: multicontainer-helm
+STATUS: deployed
+REVISION: 2
+TEST SUITE: None
+```
+Use helm history to list the release application history:
+```
+[user@host ~]$ helm history my-quarkus-application
+...output omitted...
+REVISION	UPDATED                 	STATUS    	CHART        	... 	DESCRIPTION
+1       	Thu Jun 06 08:36:13 2022	superseded	quarkus-0.0.2	 	    Install complete
+2       	Thu Aug 17 08:37:07 2023	deployed  	quarkus-0.0.3	 	    Upgrade complete
+```
+If the new chart version does not work as you expect, you can roll back to the previous version. The following example rolls back the my-quarkus-application release to revision 1.
+```
+[user@host ~]$ helm rollback my-quarkus-application 1
+Rollback was a success! Happy Helming!
+```
+Finally, you can uninstall the release:
+```
+[user@host ~]$ helm uninstall my-quarkus-application
+release "my-quarkus-application" uninstalled
+```
+
+**Creating Helm Charts**
+To generate a Helm chart directory structure, use the helm create command:
+```
+[user@host ~]$ helm create my-helm-chart
+Creating my-helm-chart
+```
+The previous command creates the following directory structure:
+```
+[user@host ~]$ tree my-helm-chart
+my-helm-chart/
+├── Chart.yaml
+├── charts
+├── templates
+│   ├── NOTES.txt
+│   ├── _helpers.tpl
+│   ├── deployment.yaml
+│   ├── hpa.yaml
+│   ├── ingress.yaml
+│   ├── service.yaml
+│   ├── serviceaccount.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml
+```
+Charts contain the following important components:
+
+`Chart.yaml`   
+This is the main chart file that contains the chart metadata. For example, it defines the chart name, its description, and version.
+
+`values.yaml`  
+The values.yaml file contains variables that you can use to template your YAML files, for example:
+```
+replicaCount: 1
+
+image:
+  repository: nginx
+  pullPolicy: IfNotPresent
+```
+`templates`  
+The templates directory holds the YAML files that you want to template and deploy. By default, Helm deploys all YAML files that are present in this directory.
+
+`templates/NOTES.txt`  
+This file configures the text that Helm prints after you install the chart. Typically, this file contains information about the deployed application, such as the application URL, or information about how developers can interact with the application.
+
+**Verify Templates**  
+When you create templates, it is useful to verify that the templates are syntactically correct, which means that Helm can render the template. Use the helm template command to render all templates in the chart, for example:
+```
+[user@host ~]$ helm template my-helm-chart
+---
+# Source: my-helm-chart/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+...output omitted...
+```
+To render a specific template, use the --show-only parameter. The short -s parameter is an alternative to the --show-only parameter.
+```
+[user@host ~]$ helm template -s templates/serviceaccount.yaml my-helm-chart
+---
+# Source: my-helm-chart/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+...output omitted...
+```
+Similarly to installing a chart, you can template a remote chart as well, for example:
+```
+[user@host ~]$ helm template openshift-helm-charts/redhat-quarkus
+---
+# Source: quarkus/templates/service.yaml
+apiVersion: v1
+kind: Service
+...output omitted...
+```
+This is useful to inspect the chart YAML files before deploying the chart without downloading the chart locally.
+
+**Template YAML Files With Helm**
+
+🔹 Cách hoạt động
+- Bạn có `values.yaml`: chứa các biến cấu hình.
+- Bạn có file trong templates/: chứa YAML + cú pháp template ({{ }}) để lấy giá trị từ values.yaml.
+- Khi chạy helm install, Helm sẽ thay thế biến bằng giá trị thật từ values.yaml rồi apply.
+
+Ví dụ 1: Dùng biến cơ bản
+
+📄 values.yaml
+```
+replicaCount: 3
+image:
+  repository: quay.io/example/deployment
+  tag: "1.0"
+```
+
+📄 templates/deployment.yaml
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-deployment
+spec:
+  replicas: {{ .Values.replicaCount }}
+  template:
+    spec:
+      containers:
+      - name: example-deployment
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+```
+
+👉 Khi render, Helm tạo ra Deployment với 3 replicas, image đúng như trong values.yaml.
+
+Ví dụ 2: Dùng with
+```
+{{ with .Values.image }}
+containers:
+- name: example-deployment
+  image: {{ .repository }}:{{ .tag }}
+{{ end }}
+```
+
+Ở đây, with .Values.image nghĩa là bạn zoom vào scope image. Bên trong, .repository = image.repository.
+
+Ví dụ 3: Dùng hàm built-in
+```
+imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" | quote }}
+```
+- default "Always": nếu pullPolicy không có, thì dùng giá trị mặc định "Always".
+- quote: bọc chuỗi trong dấu ".
+
+Ví dụ 4: Dùng điều kiện if
+```
+{{ if eq .Values.createSharedSecret "true" }}
+env:
+  - name: DATABASE_USER
+    valueFrom:
+      secretKeyRef:
+        name: postgresql
+        key: database-user
+{{ end }}
+```
+
+👉 Nghĩa là: chỉ thêm env vào container nếu trong values.yaml có:
+```
+createSharedSecret: "true"
+```
+
+Nếu false hoặc không có → đoạn YAML đó sẽ bị bỏ qua.
+
+✅ Tóm lại:
+- Helm template cho phép biến hóa YAML động: thêm/bớt, thay giá trị, điều kiện…
+- Nhờ đó 1 chart có thể deploy cho nhiều môi trường (dev, staging, prod) chỉ bằng cách đổi values.yaml, không cần viết lại YAML từ đầu.
+
+## 6.5 The Kustomize CLI
+
+The following directory structure shows an example of a Kustomize directory layout:
+```
+myapp
+├── base
+└── overlays
+  ├── production
+  └── staging
+```
+
+Resources Files
+The resources section of the kustomization.yaml file is a list of files that create all the resources for a specific environment, for example:
+
+resources:
+- deployment.yaml
+- secrets.yaml
+- service.yaml
+The layout for a base definition with the preceding resources uses the following directory structure:
+```
+myapp
+└── base
+  ├── deployment.yaml
+  ├── kustomization.yaml
+  ├── secrets.yaml
+  └── service.yaml
+```
+Separating Kubernetes object definitions into smaller files simplifies maintenance of the base set.
+
+Overlay Configuration
+The kustomization.yaml file in an overlay directory must point to one or multiple base configuration sets that form the starting point for the overlay, for example:
+```
+resources:
+- ../../base
+```
+This kustomization.yaml file is placed in an overlay, for example:
+```
+myapp/
+├── base
+│   ├── deployment.yaml
+│   ├── kustomization.yaml
+│   ├── secrets.yaml
+│   └── service.yaml
+└── overlays
+    └── staging
+        └── kustomization.yaml
+```
+This overlay starts with the base configuration and then applies any patch defined in it.  
+**Multi-container Deployments Comparison**  
+![alt text](pic/39.png)
+
+---
+# Chapter 7.  Continuous Deployment by Using Red Hat OpenShift Pipelines
+
+![alt text](pic/40.png)
+
+
+Pipelines Workflow
+
+![alt text](pic/41.png)
+
+To start a pipeline or a task, you can use the tkn CLI or the Pipelines section of the Web console, available both in the developer and administrator perspectives.
+
+![alt text](pic/43.png)
+
+**Differences with Jenkins**
+![alt text](pic/42.png)
+
+
+## Creating CI/CD Workflows by Using Red Hat OpenShift Pipelines
+**Defining Custom Tasks**
+
+![alt text](pic/44.png)
 
 
 
