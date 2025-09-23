@@ -1,6 +1,4 @@
 # Chapter 1.  Red Hat OpenShift Container Platform for Developers
-
-
 ![alt text](pic/1.png)
 Control Plane
 
@@ -1588,7 +1586,8 @@ The oc set probe command creates probes on existing workloads.
 ```
 Use the oc set probe --help command to view the available options.
 
-**Automatically Scaling Applications**   
+**Automatically Scaling Applications**  
+
 Horizontal Scaling
 
 ![alt text](pic/36.png)
@@ -1928,6 +1927,7 @@ myapp/
 ```
 This overlay starts with the base configuration and then applies any patch defined in it.  
 **Multi-container Deployments Comparison**  
+
 ![alt text](pic/39.png)
 
 ---
