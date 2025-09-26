@@ -279,13 +279,193 @@ secret/postgresql edited
 ![alt text](image-33.png)
 
 
+## 3.6 Guided Exercise: Creating Image Streams
+![alt text](image-34.png)
+Truoc do
+![alt text](image-36.png)
+Sau khi doi tag image
+![alt text](image-35.png)
 
 
+## 3.7 Lab: Building and Publishing Container Images
+
+![alt text](image-37.png)
+
+## 4.4 Guided Exercise: Managing Application Builds
+
+![alt text](image-38.png)
+
+![alt text](image-39.png)
+
+![alt text](image-40.png)
+
+![alt text](image-41.png)
+
+![alt text](image-42.png)
+
+## 4.6 Guided Exercise: Triggering Builds
 
 
+![alt text](image-43.png)
+
+![alt text](image-44.png)
+
+Commit the index.html file, and push the content into the git repository:
+```
+[student@workstation builds-triggers]$ git add index.html
+[student@workstation builds-triggers]$ git commit -m "Initial commit"
+[main (root-commit) 3edb013] Initial commit
+...output omitted...
+ 1 file changed, 1 insertion(+)
+ create mode 100644 index.html
+[student@workstation builds-triggers]$ git push
+Username for 'https://git.ocp4.example.com': developer
+Password for 'https://developer@git.ocp4.example.com':
+...output omitted...
+To https://git.ocp4.example.com/developer/builds-triggers.git
+ * [new branch]      main -> main
+```
+![alt text](image-45.png)
+
+```
+[student@workstation builds-triggers]$ oc create secret generic gitlab \
+--from-literal=username=developer --from-literal=password=d3v3lop3r
+secret/gitlab created
+```
+![alt text](image-46.png)
+
+Miss `oc get bc`
+
+## Guided Exercise: Customizing an Existing S2I Base Image
+
+![alt text](image-47.png)
 
 
+![alt text](image-48.png)
 
 
+![alt text](image-49.png)
+
+Create an application called bonjour from the provided sources. You must prefix the Git URL with the httpd:2.4-ubi9 image stream by using the tilde (~) notation to ensure that the application uses the ubi9/httpd-24 builder image.
+```
+[student@workstation s2i-scripts]$ oc new-app --name bonjour \
+--context-dir labs/builds-s2i/s2i-scripts \
+httpd:2.4-ubi9~https://git.ocp4.example.com/developer/DO288-apps
+...output omitted...
+--> Creating resources ...
+imagestream.image.openshift.io "bonjour" created
+buildconfig.build.openshift.io "bonjour" created
+deployment.apps "bonjour" created
+service "bonjour" created
+--> Success
+...output omitted..
+```
+
+![alt text](image-50.png)
+
+View the build logs.
+```
+[student@workstation s2i-scripts]$ oc logs -f bc/bonjour
+...output omitted...
+Cloning "https://git.ocp4.example.com/developer/DO288-apps" ...
+...output omitted...
+STEP 9/10: RUN /tmp/scripts/assemble
+---> Enabling s2i support in httpd24 image
+    AllowOverride All
+---> Installing application source
+---> Creating info page
+STEP 10/10: CMD /tmp/scripts/run
+COMMIT temp.builder.openshift.io/builds-s2i/bonjour-1:986469c8
+...output omitted...
+Push successful
+```
+![alt text](image-51.png)
+
+## 4.9 Lab: Managing Red Hat OpenShift Builds
+
+![alt text](image-52.png)
+
+
+![alt text](image-53.png)
+
+## 5.2 Guided Exercise: Selecting the Appropriate Deployment Strategy
+
+![alt text](image-54.png)
+
+
+![alt text](image-55.png)
+
+![alt text](image-56.png)
+
+![alt text](image-57.png)
+
+Edit the Deployment resource in the application.yaml manifest file to use the Recreate strategy. Also, be sure to update the number of replicas to five (5) to maintain the correct number of pods. Your application.yaml file should match the following excerpt by updating replicas and replacing the line strategy: {}:
+```
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+...output omitted...
+    name: users-db
+  spec:
+    replicas: 5
+    selector:
+      matchLabels:
+        deployment: users-db
+    strategy:
+      type: Recreate
+      recreateParams:
+        post:
+          failurePolicy: Abort
+          execNewPod:
+            containerName: users-db
+            command: ["/post-deploy/import.sh"]
+    template:
+      metadata:
+...output omitted...
+```
+![alt text](image-58.png)
+
+## 5.4 Guided Exercise: Managing Application Deployments
+
+![alt text](image-59.png)
+
+![alt text](image-60.png)
+
+
+![alt text](image-62.png)
+
+
+![alt text](image-61.png)
+
+## 5.6 Guided Exercise: Deploying Stateful Applications
+
+![alt text](image-63.png)
+
+Create configmap from file
+![alt text](image-64.png)
+
+
+![alt text](image-65.png)
+
+![alt text](image-66.png)
+
+
+![alt text](image-67.png)
+
+## 5.8 Guided Exercise: Monitoring Application Health
+
+
+![alt text](image-68.png)
+![alt text](image-69.png)
+
+
+![alt text](image-70.png)
+
+![alt text](image-71.png)
+
+
+![alt text](image-72.png)
+
+![alt text](image-73.png)
 
 
