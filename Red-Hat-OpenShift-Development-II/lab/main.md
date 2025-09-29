@@ -582,3 +582,43 @@ Readiness:   http-get http://:8080/q/health/ready delay=5s timeout=1s period=5s 
 ![alt text](../pic_for_lab/image-100.png)
 
 
+---
+# Chapter 8.  Comprehensive Review
+
+##  Lab: Building and Deploying a Full-stack Cloud-native Application
+Create a multicontainer application by packaging a Helm application and by using different build strategies.
+
+Outcomes
+
+- Deploy a multicontainer application on OpenShift by using various build and deploy strategies.
+
+- Build and publish a container image to an external registry.
+
+- Create Helm charts to package an OpenShift application.
+
+- Deploy a Node.js application from source code in a Git repository by passing build environment variables.
+
+- Create and consume configuration maps to store application configuration parameters.
+
+- Use Source-to-Image (S2I) to deploy an application.
+
+![alt text](image.png)
+
+![alt text](image-1.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
