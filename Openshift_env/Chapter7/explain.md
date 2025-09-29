@@ -1,8 +1,3 @@
-
-giai thich chi tiet ( tren la file pipeline.yaml ngoài ra còn run.yaml, task.yaml ban có cần cung cấp thêm ko ?)
-## ChatGPT said:
-
-
 Giải thích chi tiết pipeline.yaml + cần file gì thêm
 Ngắn gọn: file bạn gửi là Pipeline (Tekton) — nó định nghĩa luồng: clone repo → build Maven → deploy lên OpenShift bằng oc → copy image với skopeo.
 Để chạy được pipeline này trên cluster bạn chắc chắn cần 1 PipelineRun (ví dụ run.yaml) để bind workspaces/params/serviceAccount; còn task.yaml chỉ cần khi các Task được pipeline tham chiếu không có sẵn trên cluster. Dưới đây là giải thích chi tiết và mẫu PipelineRun + hai Task mẫu bạn rất có thể sẽ cần.
