@@ -1,18 +1,142 @@
-Giải thích chi tiết pipeline.yaml + cần file gì thêm  
+Tuyệt vời 👏 — dưới đây là bộ lệnh Tekton CLI (tkn) cơ bản và hay dùng nhất khi làm việc với CI/CD trên OpenShift / Kubernetes.
+Mình sẽ chia thành nhóm theo công dụng cho bạn dễ tra cứu nhé 👇
+
+🧭 1️⃣ Kiểm tra tổng thể  
+🔹 Liệt kê tài nguyên
+```
+tkn pipeline list             # Danh sách tất cả Pipeline
+tkn task list                 # Danh sách tất cả Task
+tkn pipelinerun list          # Danh sách tất cả PipelineRun (lịch sử chạy)
+tkn taskrun list              # Danh sách TaskRun (mỗi task cụ thể)
+```
+
+📋 Tip: Có thể viết ngắn gọn:
+tkn p ls, tkn t ls, tkn pr ls, tkn tr ls
+
+▶️ 2️⃣ Chạy pipeline  
+🔹 Cách 1 — Dùng tkn pipeline start
+```
+tkn pipeline start my-pipeline \
+  --param GIT_REPO=https://github.com/example/repo.git \
+  --workspace name=app-build,claimName=my-pvc \
+  --serviceaccount pipeline \
+  --showlog
+```
+
+Giải thích:
+
+my-pipeline: tên pipeline bạn đã apply.
+
+- --param: truyền giá trị cho param trong pipeline.
+
+- --workspace: gắn PVC hoặc emptyDir vào workspace.
+
+- --serviceaccount: chỉ định tài khoản chạy (nếu cần quyền).
+
+- --showlog: hiển thị log trực tiếp (chạy xong sẽ exit).
+
+📦 Một số cách gắn workspace:
+```
+--workspace name=app-build,claimName=my-pvc      # dùng PVC
+--workspace name=app-build,emptyDir=""           # dùng emptyDir tạm thời
+--workspace name=app-build,config=cm-name        # mount ConfigMap
+--workspace name=app-build,secret=secret-name    # mount Secret
+```
+🔍 3️⃣ Xem logs và trạng thái  
+🔹 Xem logs pipeline đang chạy  
+```
+tkn pipelinerun logs <pipeline-run-name> --follow
+```
+
+💡 Nếu bạn thêm --last thì xem run gần nhất:
+```
+tkn pipelinerun logs --last
+```
+🔹 Xem logs từng task trong pipeline
+
+Nếu pipeline có nhiều task, CLI sẽ hỏi bạn chọn task để xem.  
+Bạn có thể chọn hoặc chỉ định luôn:
+```
+tkn taskrun logs <taskrun-name> --follow
+```
+🔹 Xem chi tiết thông tin pipeline run
+```
+tkn pipelinerun describe <pipeline-run-name>
+```
+
+Hiển thị:
+
+- Params đã truyền
+
+- Workspaces
+
+- Các task đã chạy (và trạng thái)
+
+- Logs tóm tắt
+
+Tương tự:
+```
+tkn pipeline describe my-pipeline
+tkn task describe my-task
+```
+🛠️ 4️⃣ Xóa hoặc dọn dẹp
+```
+tkn pipelinerun delete <pipeline-run-name>
+tkn taskrun delete <task-run-name>
+tkn pipeline delete <pipeline-name>
+tkn task delete <task-name>
+```
+
+⚠️ Nếu bạn đang test nhiều lần, có thể dùng:
+```
+tkn pipelinerun delete --all
+```
+
+để dọn hết run cũ.
+
+🧠 5️⃣ Một số lệnh tiện khác
+🔹 Xem task thuộc pipeline
+```
+tkn pipeline describe my-pipeline
+```
+🔹 Xem trạng thái chung
+```
+tkn pipelinerun list --status all
+```
+🔹 Theo dõi realtime
+
+Nếu bạn muốn "tail" log như kubectl logs -f:
+```
+tkn pipelinerun logs --last --follow
+```
+💡 Mẹo hay:
+
+Bạn có thể dùng alias cho nhanh:
+``
+alias tkp='tkn pipeline'
+alias tkpr='tkn pipelinerun'
+alias tkt='tkn task'
+alias tktr='tkn taskrun'
+```
+
+→ Sau đó chỉ cần tkpr ls, tkpr logs --last, tkp start my-pipeline
+
+Giải thích chi tiết `pipeline.yaml`     
 Ngắn gọn: file bạn gửi là Pipeline (Tekton) — nó định nghĩa luồng: clone repo → build Maven → deploy lên OpenShift bằng oc → copy image với skopeo.  
 Để chạy được pipeline này trên cluster bạn chắc chắn cần 1 PipelineRun (ví dụ run.yaml) để bind workspaces/params/serviceAccount; còn task.yaml chỉ cần khi các Task được pipeline tham chiếu không có sẵn trên cluster. Dưới đây là giải thích chi tiết và mẫu PipelineRun + hai Task mẫu bạn rất có thể sẽ cần.
 
-1) Tổng quan các phần trong pipeline.yaml
-- apiVersion: tekton.dev/v1 / kind: Pipeline  
+1) Tổng quan các phần trong `pipeline.yaml`
+
+- `apiVersion`: tekton.dev/v1 / kind: Pipeline  
 Đây là Pipeline (tập hợp các Task).
 
-- workspaces
+- `workspaces`
 
   - shared: workspace chung để chia sẻ source/artifact giữa các tasks. Thường bind tới PVC (persistent volume) trong PipelineRun.
 
   - maven_config: chỗ để mount cấu hình Maven (ví dụ một ConfigMap chứa settings.xml) nếu cần.
 
-- params (tùy chỉnh) — từng biến có ý nghĩa:
+- `params` (tùy chỉnh) — từng biến có ý nghĩa:
 
   - GIT_REPO / GIT_REVISION: repo và branch/tag để clone.
 
@@ -22,7 +146,7 @@ Ngắn gọn: file bạn gửi là Pipeline (Tekton) — nó định nghĩa lu�
 
   - DEPLOY_APP_NAME: tên ứng dụng / buildconfig / service trên OpenShift.
 
-- tasks — chuỗi các bước thực thi:
+- `tasks` — chuỗi các bước thực thi:
 
 `clone-repository`
 
@@ -327,29 +451,29 @@ spec:
 
 - shared → PVC động tạo từ volumeClaimTemplate (rất hay, mỗi run PVC riêng).
 
-- maven_config → mount secret mvn-settings chứa settings.xml.
+- maven_config → mount secret mvn-settings chứa `settings.xml`.
 
 ⚠️ Gợi ý nhỏ:
 
-1. MVN_APP_PATH:
+1. `MVN_APP_PATH`:
 
-- Trong pipeline gốc bạn default "builds-applications/apps/vertx-site"
+- Trong pipeline gốc bạn default "`builds-applications/apps/vertx-site`"
 
-- Ở run.yaml bạn đổi "apps/pipelines-review/vertx-site"
+- Ở run.yaml bạn đổi "`apps/pipelines-review/vertx-site`"
 → Đảm bảo đường dẫn tồn tại trong repo (GIT_REPO). Nếu sai, task maven-task sẽ lỗi no such file or directory.
 
-2. storageClassName: nfs-storage
+2. `storageClassName: nfs-storage`
 
 - Hãy chắc chắn cluster có nfs-storage class (oc get sc). Nếu không, đổi thành class có thật (ví dụ gp2-csi trên AWS, ocs-storagecluster-cephfs, v.v.).
 
-3. finalizers: chains.tekton.dev/pipelinerun
+3. `finalizers: chains.tekton.dev/pipelinerun`
 
 - Đây là để Tekton Chains (sigstore) ghi lại provenance. Nếu bạn chưa cài Chains, có thể bỏ để tránh stuck trạng thái Running.
 
 - Nếu bạn đã cài Tekton Chains, giữ lại cũng được.
 
 🔹 3. Kiểm tra các Task tham chiếu trong Pipeline
-Trong pipeline.yaml bạn dùng 4 tasks:
+Trong `pipeline.yaml` bạn dùng 4 tasks:
 
 Task name	|Có sẵn không?|	Ghi chú
 ---|---|---
@@ -359,11 +483,13 @@ openshift-client|	✅ ClusterTask có sẵn	|OK
 skopeo-copy-internal	|❓ Cần kiểm tra|	Nếu chưa có, cần tạo Task riêng (dùng skopeo copy)
 
 👉 Chạy lệnh kiểm tra nhanh:
-
+```
 tkn task list -n openshift-pipelines
+```
 hoặc
-
+```
 kubectl get clustertasks
+```
 Nếu không có skopeo-copy-internal, bạn cần apply Task mình gợi ý mẫu ở phần trước.
 
 🔹 4. ServiceAccount pipeline
@@ -1370,7 +1496,7 @@ Pipeline "my-pipeline" not found
 hoặc
 ```
 Task "linter" not found
-```
+
 => Lúc này PipelineRun sẽ ở trạng thái Failed ngay từ đầu, vì không tìm thấy định nghĩa cần thiết.
 
 🚀 Khi đã apply đủ 3 file
@@ -1393,4 +1519,104 @@ Có cần đúng thứ tự không?	|Không bắt buộc 100%, nhưng nên apply
 Apply hết 3 file là có chạy tự động không?	|✅ Có. PipelineRun khi apply sẽ trigger chạy pipeline luôn.
 Có thể apply lại khi sửa file không?	|✅ Có, dùng oc apply -f (idempotent, cập nhật được).
 
+> PipelineRun trong run.yaml thay lẫn nhau với lệnh tkn pipeline start my-pipeline... đúng ko ?
+## ChatGPT said:
 
+🎯 Chuẩn 100% luôn bạn nhé!
+Hai cách này đều dùng để khởi chạy một Tekton PipelineRun, chỉ khác nhau cách định nghĩa và kiểm soát tham số.
+Cụ thể mình giải thích chi tiết cho bạn 👇
+
+🧩 1. Hai cách chạy Pipeline trong Tekton
+Cách chạy	Mô tả	Cấu hình ở đâu	Khi nào nên dùng
+✅ Cách 1: YAML PipelineRun	Bạn viết file run.yaml rồi oc apply -f run.yaml	Trong YAML	Khi muốn lưu cấu hình, chia sẻ, version control
+✅ Cách 2: CLI tkn pipeline start	Bạn chạy lệnh tkn pipeline start <pipeline-name>	Qua tham số dòng lệnh	Khi muốn chạy nhanh, test pipeline thủ công
+
+Cả hai đều tạo ra một PipelineRun object trong cluster 👉 Tekton controller sẽ theo dõi và chạy pipeline đó.
+
+🧩 2. Ví dụ cụ thể
+📘 Cách 1: Dùng YAML (run.yaml)
+```
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: testrun
+spec:
+  pipelineRef:
+    name: maven-java-pipeline
+  params:
+    - name: GIT_REPO
+      value: "https://git.ocp4.example.com/developer/D0288-apps"
+    - name: MVN_APP_PATH
+      value: "apps/pipelines-review/vertx-site"
+  workspaces:
+    - name: shared
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+          storageClassName: nfs-storage
+```
+
+Chạy:
+```
+oc apply -f run.yaml
+```
+
+➡️ Tekton Controller sẽ tạo 1 PipelineRun tên testrun và thực thi.
+
+📘 Cách 2: Dùng CLI tkn
+
+Giả sử pipeline của bạn tên maven-java-pipeline
+Bạn chạy:
+```
+tkn pipeline start maven-java-pipeline \
+  --param GIT_REPO=https://git.ocp4.example.com/developer/D0288-apps \
+  --param MVN_APP_PATH=apps/pipelines-review/vertx-site \
+  --workspace name=shared,volumeClaimTemplateFile=pvc-template.yaml \
+  --workspace name=maven_config,secret=mvn-settings \
+  --serviceaccount pipeline \
+  --showlog
+```
+
+🔸 tkn sẽ tự tạo ra một PipelineRun tạm (random name) trong cluster.  
+🔸 Các tham số được truyền bằng flag --param và --workspace.
+
+🧩 3. Giống nhau ở đâu?
+
+✅ Giống nhau 100% về bản chất  
+→ Cả hai đều tạo PipelineRun object → Tekton Controller xử lý, tạo các TaskRun, Pod tương ứng.
+
+✅ Đều có thể xem log, describe,...
+```
+tkn pipelinerun list
+tkn pipelinerun logs testrun -f
+```
+🧩 4. Khác nhau ở đâu?
+So sánh	|YAML run.yaml	|tkn pipeline start
+---|---|---
+Cách chạy	|oc apply -f	|CLI tkn pipeline start
+Tên PipelineRun	|Bạn đặt trong metadata|	Auto-generate (hoặc --name)
+Quản lý cấu hình|	File YAML có thể commit vào git	|Chạy thủ công, khó lặp lại
+Tái sử dụng|	Dễ (apply lại file)	|Khó (phải nhớ tham số)
+Giao diện|	Hợp với GitOps|	Hợp với test/debug
+Khả năng kiểm soát	|Cao hơn (có thể thêm label, annotations, finalizer,...)|	Giới hạn theo CLI
+
+🧩 5. Tổng kết
+
+✅ Cả hai cách đều tương đương:
+```
+oc apply -f run.yaml = tkn pipeline start <pipeline-name> ...
+```
+💡 Khuyến nghị:
+
+Dùng run.yaml nếu bạn muốn lưu cấu hình CI/CD trong Git (theo GitOps)
+
+Dùng tkn nếu bạn muốn test nhanh hoặc chạy thủ công
+
+🎯 Tóm tắt:
+
+✔️ PipelineRun YAML = chạy bằng manifest  
+✔️ tkn pipeline start = chạy bằng CLI  
+🚀 Kết quả cuối cùng là Tekton Controller tạo 1 PipelineRun và chạy nó
