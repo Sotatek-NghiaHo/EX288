@@ -49,11 +49,18 @@ spec:
 
     - name: build
       taskRef:
-        # TODO: điền task build (ví dụ: maven)
+        name: maven-task
+        kind: Task
       params:
-        # TODO: params build (MAVEN_GOALS, PATH, …)
+        - name: app_path
+          value: $(params.MVN_APP_PATH)
+      runAfter:
+        - clone-repository
       workspaces:
-        # TODO: map shared, maven_config
+        - workspace: shared
+          name: source
+        - workspace: maven_config
+          name: maven_config
 
     - name: oc-deploy
       taskRef:
