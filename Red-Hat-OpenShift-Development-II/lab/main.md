@@ -602,9 +602,9 @@ Outcomes
 
 - Use Source-to-Image (S2I) to deploy an application.
 
-![alt text](image.png)
+![alt text](../pic_for_lab/101.png)
 
-![alt text](image-1.png)
+![alt text](../pic_for_lab/102.png)
 
 
 
