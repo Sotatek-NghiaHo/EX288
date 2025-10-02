@@ -539,7 +539,6 @@ Ví dụ trong CI/CD (Tekton hoặc Jenkins):
 📊 3. So sánh trực quan
 Tiêu chí	|oc process (OpenShift Template)	|Helm Chart
 ---|---|---
-
 Cú pháp	|YAML OpenShift Template	|YAML Helm Template ({{ }})
 Render|	oc process	|helm template
 Deploy	|oc apply -f -	|helm install / helm upgrade
