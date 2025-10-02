@@ -525,70 +525,71 @@ Mỗi tag trong IS (ví dụ custom-server:1.0) sẽ trỏ tới digest cụ th�
 
 🧠 Vấn đề hay gặp khi dùng External Registry
 ❌ 1. Không import được image
+```
 oc import-image myapp:1.0 --from=quay.io/myorg/myapp:1.0 --confirm
-
+```
 
 Nếu registry yêu cầu login, bạn cần tạo secret:
-
+```
 oc create secret docker-registry registry-credentials \
   --docker-server=quay.io \
   --docker-username=<username> \
   --docker-password=<password> \
   --docker-email=<email>
-
+```
 
 Sau đó gắn secret vào ServiceAccount:
-
+```
 oc secrets link default registry-credentials --for=pull
-
+```
 
 Rồi mới oc import-image được.
 
 ❌ 2. Không auto trigger được
 
-Nếu bạn deploy app từ external image trực tiếp (oc new-app quay.io/myorg/myapp:1.0)
-→ Không có ImageStreamTag → DC không có ImageChange trigger
+Nếu bạn deploy app từ external image trực tiếp (oc new-app quay.io/myorg/myapp:1.0)  
+→ Không có ImageStreamTag → DC không có ImageChange trigger  
 → Không có tự động redeploy khi image thay đổi
 
 🩵 Cách khắc phục: Import image đó về IS rồi dùng IS:
-
+```
 oc import-image myapp:1.0 --from=quay.io/myorg/myapp:1.0 --confirm
 oc new-app myapp:1.0
-
+```
 ❌ 3. Không pull được image (Pod lỗi ImagePullBackOff)
 
 Nguyên nhân: Pod chạy trong namespace không có quyền pull từ external registry
 
 Giải pháp:
 
-Tạo secret docker-registry
+- Tạo secret docker-registry
 
-Link secret vào SA default
-
+- Link secret vào SA default
+```
 oc secrets link default registry-credentials --for=pull
-
+```
 🏠 Với Internal Registry
 
 ✅ Ưu điểm:
 
-Không cần auth nếu cùng project
+- Không cần auth nếu cùng project
 
-Có thể trigger tự động
+- Có thể trigger tự động
 
-Có thể dùng ImageStreamTag để CI/CD dễ dàng
+- Có thể dùng ImageStreamTag để CI/CD dễ dàng
 
-Có thể push trực tiếp từ BuildConfig, Pipeline, hoặc oc push
+- Có thể push trực tiếp từ BuildConfig, Pipeline, hoặc oc push
 
 ✅ Lỗi thường gặp:
 
-Quên bật image registry (oc get pods -n openshift-image-registry)
+- Quên bật image registry (oc get pods -n openshift-image-registry)
 
-Không expose registry ra ngoài nên không push được từ local
+- Không expose registry ra ngoài nên không push được từ local
 
-Quên gán quyền system:image-puller giữa project A → B nếu project B muốn dùng image của project A:
-
+- Quên gán quyền system:image-puller giữa project A → B nếu project B muốn dùng image của project A:
+```
 oc policy add-role-to-user system:image-puller system:serviceaccount:B:default -n A
-
+```
 🧩 3️⃣ Tóm tắt khi thi EX288
 | Trường hợp                     | Cách tốt nhất                                        |
 | ------------------------------ | ---------------------------------------------------- |
@@ -608,6 +609,8 @@ oc policy add-role-to-user system:image-puller system:serviceaccount:B:default -
 - DC chỉ auto redeploy khi theo dõi ImageStreamTag (không phải image URL)
 
 - oc import-image chỉ cập nhật metadata, không kéo image về cluster, mà để trigger DC
+
+---
 
 🏠 Bài 1: Dùng Internal Registry (có sẵn trong OpenShift)
 
