@@ -214,7 +214,7 @@ not a	|phủ định
 
 ---
 
-Verify Templates
+## Verify Templates  
 When you create templates, it is useful to verify that the templates are syntactically correct, which means that Helm can render the template. Use the helm template command to render all templates in the chart, for example:
 ```
 [user@host ~]$ helm template my-helm-chart
@@ -224,9 +224,9 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
 ...output omitted..
-
+```
 ---
-```🎯 Vấn đề bạn hỏi
+🎯 Vấn đề bạn hỏi
 
 - helm install → cũng deploy app lên OpenShift
 
