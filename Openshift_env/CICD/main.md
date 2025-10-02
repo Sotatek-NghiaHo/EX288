@@ -214,6 +214,7 @@ Bạn muốn mang chart sang K8s khác, có logic phức tạp	|Helm
 Bạn cần rollback, release version	|Helm
 Bạn deploy nhiều microservice, muốn tái dùng chart	|Helm
 Bạn học Red Hat EX288	|oc process (OpenShift Template)
+
 ✅ Tóm lại:
 
 - Ví dụ bạn đang làm → dùng oc process để render template → deploy, không cần Helm.
@@ -404,15 +405,15 @@ Step Command:
   git clone https://github.com/org/app.git --branch main
 ```
 
-🔹 Đúng.
-name và value trong khối params (cùng cấp với taskRef) phải khớp 100% với định nghĩa của Task/ClusterTask mà bạn gọi.
+🔹 Đúng.  
+`name` và `value` trong khối params (cùng cấp với `taskRef`) phải khớp 100% với định nghĩa của Task/ClusterTask mà bạn gọi.
 Nếu sai tên (name), Tekton sẽ báo lỗi không tìm thấy param.
 Nếu sai kiểu dữ liệu hoặc giá trị (value), pipeline có thể chạy sai logic hoặc fail.
 
 🧭 Giải thích chi tiết theo cấu trúc Tekton
 
 Mỗi Task hoặc ClusterTask được định nghĩa với danh sách params như sau:
-
+```
 spec:
   params:
     - name: URL
@@ -420,32 +421,32 @@ spec:
     - name: REVISION
       description: Branch or tag
       default: main
-
+```
 
 👉 Điều này có nghĩa là:
 
-Task đó chỉ chấp nhận param tên URL và REVISION.
+- Task đó chỉ chấp nhận param tên URL và REVISION.
 
-Khi bạn gọi task này trong pipeline, bạn phải dùng đúng name như vậy trong phần params:.
+- Khi bạn gọi task này trong pipeline, bạn phải dùng đúng name như vậy trong phần params:.
 
 ⚠️ Nếu viết sai, chuyện gì xảy ra?
 
 Ví dụ, nếu bạn viết sai như sau:
-
+```
 params:
   - name: REPO_URL   # ❌ Sai tên, không khớp với 'URL' trong task
     value: $(params.GIT_REPO)
-
+```
 
 Pipeline sẽ báo lỗi kiểu:
-
+```
 Error: task git-clone has no parameter named "REPO_URL"
-
+```
 
 hoặc:
-
+```
 missing parameter "URL" for task git-clone
-
+```
 
 🔥 Khi thi EX288, đây là lỗi chết người, vì pipeline sẽ không chạy, mất điểm!
 
