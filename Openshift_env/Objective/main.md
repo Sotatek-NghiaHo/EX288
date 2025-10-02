@@ -119,7 +119,8 @@ oc get events
 
 ✅ Web Console: tab “Events” và “Logs”
 
-**5. Work with image streams**
+**5. Work with image streams**  
+Chapter 3.5
 - Create custom image streams to deploy applications
 - Pull applications from existing Git repositories
 - Trigger updates on image stream changes
