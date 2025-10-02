@@ -294,3 +294,212 @@ basic-user-pass	|Secret chứa thông tin login registry
 👉 Tóm lại:
 `oc secret link pipeline basic-user-pass` giúp Tekton dùng được credential (username/password) trong `secret basic-user-pass` để đăng nhập vào registry https://registry.ocp4.example.com:8443 khi build/push image.
 
+---
+Khi bạn chạy hai lệnh theo thứ tự này:
+```
+oc secret link pipeline basic-user-pass
+tkn pipeline start --use-param-defaults words-cicd-pipeline \
+  -p APP_PATH=apps/compreview-cicd/words \
+  -w name=shared,volumeClaimTemplateFile=volume-template.yaml
+```
+
+👉 Tekton Pipeline sẽ tự động sử dụng secret basic-user-pass (đã được gắn vào ServiceAccount pipeline) mà không cần bạn chỉ định thêm gì nữa.
+
+🧠 Giải thích cơ chế chi tiết:
+1. tkn pipeline start dùng ServiceAccount nào?
+
+- Khi bạn không truyền flag --serviceaccount, Tekton mặc định dùng ServiceAccount tên là pipeline.
+
+- Đây là ServiceAccount có sẵn trong namespace bạn đang dùng (oc project compreview-cicd).
+
+2. Bạn đã liên kết secret vào SA đó:
+```
+oc secret link pipeline basic-user-pass
+```
+
+- Câu lệnh này gắn secret basic-user-pass vào ServiceAccount pipeline (với quyền pull,mount).
+
+- Sau khi link, nếu bạn xem YAML của ServiceAccount này (oc get sa pipeline -o yaml), bạn sẽ thấy secret đó nằm trong hai nơi:
+```
+secrets:
+  - name: basic-user-pass
+imagePullSecrets:
+  - name: basic-user-pass
+```
+3. Tekton khi chạy PipelineRun sẽ:
+
+- Tạo ra các Pod để chạy từng Task.
+
+- Những Pod này sẽ chạy dưới ServiceAccount pipeline.
+
+- Vì SA này đã có secret gắn vào, các Pod đó sẽ:
+
+  - Dùng được credential trong secret để đăng nhập vào registry (https://registry.ocp4.example.com:8443).
+
+  - Kéo hoặc đẩy image mà không bị lỗi unauthorized: authentication required.
+
+🧩 Kết quả:
+
+✅ Không cần thêm --serviceaccount vì mặc định là pipeline.
+
+✅ Không cần chỉ định secret trong lệnh Tekton, vì đã link vào SA.
+
+✅ Tekton sẽ tự động dùng secret trong các Task build/push image.
+
+⚠️ Lưu ý nhỏ:
+
+1. Nếu bạn có nhiều secret registry khác nhau → nên chỉ định annotation trong secret:
+```
+annotations:
+  tekton.dev/docker-0: https://registry.ocp4.example.com:8443
+```
+
+(bạn đã có rồi 👍)
+
+2. Nếu pipeline của bạn sử dụng một service account khác (ví dụ: custom-sa), bạn cần link secret vào SA đó hoặc dùng flag:
+```
+tkn pipeline start ... --serviceaccount custom-sa
+```
+
+👉 Tóm lại:
+Vì bạn đã `oc secret link pipeline basic-user-pass`, nên khi chạy tkn pipeline start, Tekton sẽ tự động sử dụng secret đó để đăng nhập registry và push/pull image mà không cần thêm cấu hình gì khác ✅
+
+
+---
+```
+  tasks:
+    # 🧩 1. Clone code từ Git
+    - name: fetch-repository
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: git-clone
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: URL
+          value: $(params.GIT_REPO)
+        - name: REVISION
+          value: $(params.GIT_REVISION)
+        - name: DELETE_EXISTING
+          value: "true"
+        - name: SSL_VERIFY
+          value: "false"
+      workspaces:
+        - name: output
+          workspace: shared
+```
+workflow
+```
+Pipeline Param (GIT_REPO = https://github.com/org/app.git)
+        ↓
+Task Param URL = $(params.GIT_REPO)
+        ↓
+ClusterTask Param URL = https://github.com/org/app.git
+        ↓
+Step Command:
+  git clone https://github.com/org/app.git --branch main
+```
+
+🔹 Đúng.
+name và value trong khối params (cùng cấp với taskRef) phải khớp 100% với định nghĩa của Task/ClusterTask mà bạn gọi.
+Nếu sai tên (name), Tekton sẽ báo lỗi không tìm thấy param.
+Nếu sai kiểu dữ liệu hoặc giá trị (value), pipeline có thể chạy sai logic hoặc fail.
+
+🧭 Giải thích chi tiết theo cấu trúc Tekton
+
+Mỗi Task hoặc ClusterTask được định nghĩa với danh sách params như sau:
+
+spec:
+  params:
+    - name: URL
+      description: Git repository URL
+    - name: REVISION
+      description: Branch or tag
+      default: main
+
+
+👉 Điều này có nghĩa là:
+
+Task đó chỉ chấp nhận param tên URL và REVISION.
+
+Khi bạn gọi task này trong pipeline, bạn phải dùng đúng name như vậy trong phần params:.
+
+⚠️ Nếu viết sai, chuyện gì xảy ra?
+
+Ví dụ, nếu bạn viết sai như sau:
+
+params:
+  - name: REPO_URL   # ❌ Sai tên, không khớp với 'URL' trong task
+    value: $(params.GIT_REPO)
+
+
+Pipeline sẽ báo lỗi kiểu:
+
+Error: task git-clone has no parameter named "REPO_URL"
+
+
+hoặc:
+
+missing parameter "URL" for task git-clone
+
+
+🔥 Khi thi EX288, đây là lỗi chết người, vì pipeline sẽ không chạy, mất điểm!
+
+✅ Ví dụ đúng chuẩn
+
+Giả sử bạn gọi ClusterTask git-clone (có URL, REVISION, DELETE_EXISTING):
+```
+- name: fetch-repository
+  taskRef:
+    resolver: cluster
+    params:
+      - name: kind
+        value: task
+      - name: name
+        value: git-clone
+      - name: namespace
+        value: openshift-pipelines
+  params:
+    - name: URL                # ✅ đúng với task định nghĩa
+      value: $(params.GIT_REPO)
+    - name: REVISION           # ✅ đúng tên
+      value: $(params.GIT_REVISION)
+    - name: DELETE_EXISTING
+      value: "true"
+    - name: SSL_VERIFY
+      value: "false"
+```
+
+| Mẹo                                                               | Diễn giải                                                                           |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 🎯 **“Tên phải match 100% với Task gốc”**                         | Lấy từ `oc get clustertask <tên> -o yaml`                                           |
+| 🔍 **“TaskRef.params ≠ Task.params”**                             | Cái đầu để xác định task nào, cái sau truyền giá trị                                |
+| 🧩 **“name ở ngoài là key, value là giá trị (có thể chứa biến)”** | `name` = tên param trong task, `value` = giá trị thực (literal hoặc $(params.xxx))` |
+
+
+🧪 Cách kiểm tra nhanh khi không nhớ tên param
+
+Trước khi viết pipeline, bạn có thể xem task thật bằng:
+```
+oc get clustertask git-clone -o yaml | grep -A3 params
+```
+
+Hoặc xem trong tài liệu Tekton:
+```
+tkn clustertask describe git-clone
+```
+
+➡️ Từ đó bạn copy đúng name param vào pipeline.
+
+🧩 Tóm lại:
+
+✅ name trong params (ngoài taskRef) phải trùng với param định nghĩa trong task gốc.  
+✅ value là giá trị bạn truyền vào (literal hoặc từ pipeline param).  
+❌ Không được đổi tên param.  
+❌ Không được bỏ param bắt buộc (nếu task không có default).  
+
+

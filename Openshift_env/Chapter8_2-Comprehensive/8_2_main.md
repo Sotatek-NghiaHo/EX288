@@ -55,6 +55,8 @@ Flag này có nghĩa là:
 
 Nhờ đó bạn không cần phải truyền tất cả tham số, chỉ truyền những cái bạn muốn thay đổi.
 
+Cụ thể hơn một chút: flag `--use-param-defaults` chỉ giúp tự động nhận giá trị mặc định mà không cần bạn phải bấm Enter để xác nhận từng param khi dùng CLI tkn.
+
 📌 Ví dụ:
 Nếu pipeline có params:
 ```
@@ -84,6 +86,8 @@ value: apps/compreview-cicd/words
 ```
 
 - Nghĩa là pipeline này có một tham số APP_PATH và bạn override giá trị mặc định của nó bằng apps/compreview-cicd/words.
+
+Không cần, nếu bạn muốn dùng đúng giá trị mặc định đã khai báo trong pipeline (default: "apps/compreview-cicd/words") thì không cần chỉ định lại bằng -p
 
 5. `-w name=shared,volumeClaimTemplateFile=volume-template.yaml`
 
@@ -148,6 +152,34 @@ spec:
             requests:
               storage: 1Gi
 ```
+
+
+---
+```
+    # 🚀 6. Triển khai ra OpenShift
+    - name: oc-deploy
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: openshift-client
+          - name: namespace
+            value: openshift-pipelines
+      workspaces:
+        - name: manifest_dir
+          workspace: shared
+      params:
+        - name: SCRIPT
+          value: |
+            oc process -f $(params.APP_PATH)/kubefiles/app.yaml \
+              -p IMAGE_NAME=$(params.IMAGE_REGISTRY)/$(context.pipelineRun.namespace)/$(params.IMAGE_NAME):$(context.pipelineRun.uid) \
+              | oc apply -f -
+      runAfter:
+        - build-push-image
+```
+
 
 
 
