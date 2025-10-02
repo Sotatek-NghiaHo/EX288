@@ -98,6 +98,7 @@ Tổng kết
 | `$(params.XXX)`       | Biến pipeline                                         | Định nghĩa ở đầu `spec.params:`                           |
 | `$(context.XXX)`      | Biến runtime (do Tekton cung cấp)                     | Tekton tự sinh (namespace, uid, run name, …)              |
 
+---
 Chính xác luôn 👍 — ví dụ bạn đưa ra (dùng Tekton task openshift-client + oc process) là một kiểu deploy riêng, không cần Helm.
 Helm và oc là hai cách khác nhau để triển khai ứng dụng lên OpenShift.
 Mình giải thích kỹ để bạn hiểu khi nào dùng cái nào nhé 👇
@@ -203,6 +204,7 @@ Quản lý version (rollback)	|❌ Không	|✅ Có
 Tích hợp CI/CD	|✅ Dễ (task openshift-client)	|✅ Dễ (task helm)
 Dành cho	|OpenShift-only	|Kubernetes/OpenShift
 Độ linh hoạt	|Trung bình|	Cao
+
 💡 4. Vậy khi nào nên dùng cái nào?
 Tình huống	|Gợi ý dùng
 ---|---
@@ -224,7 +226,71 @@ Bạn học Red Hat EX288	|oc process (OpenShift Template)
 
   - Hoặc dùng chart có sẵn (redis, postgres,...)
 
+---
 
+lệnh `oc secret link `là một phần rất quan trọng khi bạn chạy Tekton Pipeline (hoặc BuildConfig) trong OpenShift, vì nó giúp liên kết Secret với ServiceAccount. Mình giải thích chi tiết nhé 👇
 
+🔹 Cú pháp tổng quát
+```
+oc secret link <serviceaccount> <secret-name> [--for=pull|push|mount]
+```
+🔸 Mục đích
 
+Lệnh này dùng để gắn (link) một Secret có sẵn vào một ServiceAccount nào đó, để ServiceAccount có thể sử dụng thông tin xác thực trong secret đó khi thực hiện các hành động như:
+
+- pull/push image từ registry (nếu secret là loại docker hoặc basic-auth registry)
+
+- mount secret vào pod (để truy cập dữ liệu hoặc credential)
+
+- login vào Git hoặc các service cần chứng thực (nếu pipeline có task clone git hoặc push image)
+
+🔹 Giải thích câu lệnh bạn dùng
+```
+oc secret link pipeline basic-user-pass
+```
+
+- `pipeline`: là tên của **ServiceAccount** mà Tekton mặc định dùng để chạy các task trong pipeline.  
+👉 Mỗi PipelineRun sẽ dùng một **ServiceAccount** để xác định quyền và credential khi thực thi.
+
+- basic-user-pass: là tên Secret bạn vừa apply từ file basic-user-pass.yaml.
+
+> Như vậy, câu lệnh này nghĩa là:  
+➤ “Gắn secret `basic-user-pass` vào serviceaccount `pipeline`, để khi pipeline chạy, nó có thể dùng secret đó.”
+
+🔹 Khi nào cần oc secret link
+
+Bạn cần oc secret link nếu:
+
+Mục đích	|Secret Type	|--for
+Tekton cần pull/push image từ registry có authentication	|kubernetes.io/basic-auth hoặc kubernetes.io/dockerconfigjson	|--for=pull hoặc --for=pull,mount
+Task cần mount secret để sử dụng file hay token|	Bất kỳ	|--for=mount
+Git clone private repo	|kubernetes.io/basic-auth hoặc kubernetes.io/ssh-auth	|--for=mount
+🔸 Mặc định nếu bạn không ghi --for=...
+
+Nếu bạn không chỉ định --for, thì mặc định OpenShift sẽ link cho cả pull và mount.
+Nói cách khác, secret đó sẽ:
+
+- được mount vào các Pod dùng SA đó
+
+- được dùng để pull/push image từ registry
+
+✅ Do đó, lệnh của bạn:
+```
+oc secret link pipeline basic-user-pass
+```
+
+tương đương với:
+```
+oc secret link pipeline basic-user-pass --for=pull,mount
+```
+🧠 Tổng kết
+Thành phần	|Ý nghĩa
+---|---
+oc secret link	|Lệnh liên kết secret với serviceaccount
+pipeline	|ServiceAccount Tekton sử dụng để chạy PipelineRun
+basic-user-pass	|Secret chứa thông tin login registry
+--for=pull,mount (mặc định)	|Cho phép dùng secret để pull/push image và mount vào pod
+
+👉 Tóm lại:
+`oc secret link pipeline basic-user-pass` giúp Tekton dùng được credential (username/password) trong `secret basic-user-pass` để đăng nhập vào registry https://registry.ocp4.example.com:8443 khi build/push image.
 
