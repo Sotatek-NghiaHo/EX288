@@ -128,15 +128,15 @@ Helm template cho phép bạn thêm câu điều kiện (if, else, range, with, 
   {{ end }}
   name: example-deployment
 ```
-🧠 Phân tích chi tiết
+🧠 Phân tích chi tiết  
 🔹 1. `if` trong Helm
 
 Cú pháp:
-
+```
 {{ if CONDITION }}
 # nội dung
 {{ end }}
-
+```
 
 Helm chỉ render nội dung giữa `if` và `end` nếu điều kiện đúng (true).
 
