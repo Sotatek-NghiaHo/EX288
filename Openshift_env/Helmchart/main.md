@@ -337,3 +337,239 @@ Khi bạn push code mới:
 
 Helm upgrade deployment lên version mới  
 ➡️ CI/CD chạy Helm giùm bạn
+
+---
+Chuẩn rồi 👏 — lệnh helm install myapp . (hay helm install myapp ./chart) phụ thuộc vào vị trí bạn đang đứng (working directory) và đường dẫn đến chart mà bạn chỉ định.
+Mình sẽ giải thích cực rõ để bạn hiểu cơ chế:
+
+🧭 1. Cú pháp tổng quát
+```
+helm install <release-name> <chart-path> [flags]
+```
+
+- <release-name>: tên release mà Helm tạo trên cluster (ví dụ myapp)
+
+- <chart-path>: đường dẫn đến thư mục chứa Chart.yaml (Helm chart root)
+
+- [flags]: tuỳ chọn thêm (ví dụ -f values.yaml, --set image.tag=latest, ...)
+
+📂 2. Về <chart-path>
+
+Helm cần tìm file Chart.yaml, templates/, và values.yaml bên trong đường dẫn này.
+
+Vì vậy:
+
+Nếu bạn đang đứng ngay trong thư mục chart, dùng . (tức “current directory”)
+```
+cd famous-quotes/
+helm install myapp .
+```
+
+👉 Helm sẽ tìm file famous-quotes/Chart.yaml
+
+Nếu bạn đang đứng ở thư mục cha, dùng đường dẫn con:
+```
+cd ..
+helm install myapp ./famous-quotes
+```
+
+👉 Helm sẽ tìm file famous-quotes/Chart.yaml
+
+Nếu bạn lưu chart trong thư mục con chart/, thì:
+```
+helm install myapp ./chart
+```
+
+👉 Helm sẽ tìm chart/Chart.yaml
+
+🧩 3. Ví dụ cụ thể
+
+Giả sử bạn có cây thư mục:
+```
+/home/student/famous-quotes/
+├── Chart.yaml
+├── values.yaml
+├── templates/
+└── charts/
+```
+
+Nếu bạn đứng trong /home/student/famous-quotes:
+```
+helm install myapp .
+```
+
+Nếu bạn đứng trong /home/student:
+```
+helm install myapp ./famous-quotes
+```
+
+Kết quả giống hệt nhau ✅
+Vì cả hai lệnh đều trỏ đến thư mục chứa file Chart.yaml.
+
+⚙️ 4. Khi nào cần helm create
+
+Lệnh:
+```
+helm create mychart
+```
+
+→ chỉ để tạo khung chart mới (tạo sẵn Chart.yaml, templates/, values.yaml, …)
+
+Sau khi tạo, bạn có thể:
+```
+cd mychart
+helm install myapp .
+```
+
+Hoặc từ thư mục cha:
+```
+helm install myapp ./mychart
+```
+💡 5. Gợi ý nhớ nhanh
+Lệnh	|Nghĩa|	Khi dùng
+---|---|---
+helm install myapp .	|Cài chart ở thư mục hiện tại	|Khi bạn đang đứng trong chart
+helm install myapp ./chart	|Cài chart ở thư mục con chart/	|Khi chart nằm trong thư mục con
+helm install myapp path/to/chart	|Đường dẫn cụ thể	|Khi chart ở nơi khác
+
+✅ Tóm lại:
+
+- Dấu . = “thư mục hiện tại”
+
+- Chỉ cần trỏ đến thư mục chứa Chart.yaml
+
+- Không cần đúng thư mục helm create, chỉ cần đó là Helm chart hợp lệ
+
+---
+
+Chính xác luôn 👍 — ví dụ bạn đưa ra (dùng Tekton task openshift-client + oc process) là một kiểu deploy riêng, không cần Helm.
+Helm và oc là hai cách khác nhau để triển khai ứng dụng lên OpenShift.
+Mình giải thích kỹ để bạn hiểu khi nào dùng cái nào nhé 👇
+
+⚙️ 1. Trong ví dụ của bạn (Tekton + oc process)
+
+Bạn đang dùng Template kiểu OpenShift (oc process) để deploy:
+```
+oc process -f $(params.APP_PATH)/kubefiles/app.yaml \
+  -p IMAGE_NAME=... \
+  | oc apply -f -
+```
+🔹 Nghĩa là gì:
+
+oc process -f app.yaml → render file app.yaml (template của OpenShift)
+
+-p IMAGE_NAME=... → truyền biến thay thế (giống Helm values)
+
+| oc apply -f - → gửi YAML render ra lên cluster (deploy)
+
+➡️ Đây là kiểu triển khai native của OpenShift, không dùng Helm.
+Bạn định nghĩa template kiểu OpenShift, ví dụ:
+```
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+  - name: IMAGE_NAME
+objects:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: myapp
+    spec:
+      template:
+        spec:
+          containers:
+          - name: myapp
+            image: ${IMAGE_NAME}
+```
+
+oc process + oc apply = render + deploy (OpenShift native)
+
+✅ Ưu điểm:
+
+- Đơn giản, chạy được ngay trên OpenShift
+
+- Không cần Helm chart
+
+- Tekton dùng task openshift-client nên tích hợp dễ
+
+❌ Nhược điểm:
+
+- Template ít chức năng hơn Helm (không có if, range, include,...)
+
+- Không quản lý release/version như Helm
+
+- Không tái sử dụng dễ như chart
+
+⛵ 2. Khi nào dùng Helm
+
+Helm là package manager cho Kubernetes/OpenShift.
+Bạn dùng Helm chart thay cho template .yaml thường.
+
+Ví dụ trong CI/CD (Tekton hoặc Jenkins):
+```
+- name: helm-deploy
+  taskSpec:
+    steps:
+      - name: deploy
+        image: alpine/helm:3.12.0
+        script: |
+          helm upgrade --install myapp ./chart \
+            --set image.repository=$(params.IMAGE_REGISTRY)/$(context.pipelineRun.namespace)/$(params.IMAGE_NAME) \
+            --set image.tag=$(context.pipelineRun.uid)
+```
+
+➡️ Tekton chạy Helm, Helm render ra YAML và apply cho bạn.
+
+✅ Ưu điểm Helm:
+
+- Có logic template mạnh (if, with, range, include…)
+
+- Dễ tái sử dụng chart cho nhiều môi trường (dev/stage/prod)
+
+- Quản lý release (helm ls, helm rollback)
+
+- Dễ chia sẻ chart giữa các team
+
+❌ Nhược điểm:
+
+- Cần học cú pháp Helm
+
+- Nặng hơn oc process nếu chỉ deploy đơn giản
+
+📊 3. So sánh trực quan
+Tiêu chí	|oc process (OpenShift Template)	|Helm Chart
+---|---|---
+
+Cú pháp	|YAML OpenShift Template	|YAML Helm Template ({{ }})
+Render|	oc process	|helm template
+Deploy	|oc apply -f -	|helm install / helm upgrade
+Logic (if, with, range)	|❌ Không có	|✅ Có
+Quản lý version (rollback)	|❌ Không	|✅ Có
+Tích hợp CI/CD	|✅ Dễ (task openshift-client)	|✅ Dễ (task helm)
+Dành cho	|OpenShift-only	|Kubernetes/OpenShift
+Độ linh hoạt	|Trung bình|	Cao
+💡 4. Vậy khi nào nên dùng cái nào?
+Tình huống	|Gợi ý dùng
+---|---
+Bạn chỉ dùng OpenShift, muốn deploy đơn giản	|oc process
+Bạn đã có template OpenShift cũ (v1, v2)	|oc process
+Bạn muốn mang chart sang K8s khác, có logic phức tạp	|Helm
+Bạn cần rollback, release version	|Helm
+Bạn deploy nhiều microservice, muốn tái dùng chart	|Helm
+Bạn học Red Hat EX288	|oc process (OpenShift Template)
+✅ Tóm lại:
+
+- Ví dụ bạn đang làm → dùng oc process để render template → deploy, không cần Helm.
+
+- Helm là công cụ render + quản lý chart mạnh mẽ hơn, dùng khi:
+
+  - Muốn deploy phức tạp, đa môi trường
+
+  - Muốn versioning, rollback
+
+  - Hoặc dùng chart có sẵn (redis, postgres,...)
+
+
+
+
+
