@@ -99,7 +99,7 @@ podman push image quay.io/.../myapp image-registry.openshift-image-registry.svc:
 ✅ Web Console: Build → ImageStreams / Builds
 
 
-**Troubleshoot application builds and deployment issues**
+**4. Troubleshoot application builds and deployment issues**
 - Diagnose and correct minor issues with application deployment
 - Diagnose and correct minor issues with build process
 
