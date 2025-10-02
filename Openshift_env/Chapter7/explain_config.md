@@ -112,14 +112,14 @@ tkn pipelinerun logs --last --follow
 💡 Mẹo hay:
 
 Bạn có thể dùng alias cho nhanh:
-``
+```
 alias tkp='tkn pipeline'
 alias tkpr='tkn pipelinerun'
 alias tkt='tkn task'
 alias tktr='tkn taskrun'
 ```
 
-→ Sau đó chỉ cần tkpr ls, tkpr logs --last, tkp start my-pipeline
+→ Sau đó chỉ cần `tkpr ls, tkpr logs --last, tkp start my-pipeline`
 
 Giải thích chi tiết `pipeline.yaml`     
 Ngắn gọn: file bạn gửi là Pipeline (Tekton) — nó định nghĩa luồng: clone repo → build Maven → deploy lên OpenShift bằng oc → copy image với skopeo.  
@@ -1528,7 +1528,7 @@ Cụ thể mình giải thích chi tiết cho bạn 👇
 
 🧩 1. Hai cách chạy Pipeline trong Tekton
 Cách chạy	Mô tả	Cấu hình ở đâu	Khi nào nên dùng
-✅ Cách 1: YAML PipelineRun	Bạn viết file run.yaml rồi oc apply -f run.yaml	Trong YAML	Khi muốn lưu cấu hình, chia sẻ, version control
+✅ Cách 1: YAML PipelineRun	Bạn viết file run.yaml rồi oc apply -f run.yaml	Trong YAML	Khi muốn lưu cấu hình, chia sẻ, version control  
 ✅ Cách 2: CLI tkn pipeline start	Bạn chạy lệnh tkn pipeline start <pipeline-name>	Qua tham số dòng lệnh	Khi muốn chạy nhanh, test pipeline thủ công
 
 Cả hai đều tạo ra một PipelineRun object trong cluster 👉 Tekton controller sẽ theo dõi và chạy pipeline đó.
