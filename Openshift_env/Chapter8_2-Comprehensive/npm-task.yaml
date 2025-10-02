@@ -1,0 +1,38 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: npm
+spec:
+  workspaces:
+    - name: source
+      description: The workspace containing the source code
+
+  params:
+    - name: CONTEXT
+      type: string
+      default: "."
+      description: The path where package.json of the project is defined.
+
+    - name: ARGS
+      type: string
+      description: Arguments to pass to npm (e.g. install, test, run build)
+
+    - name: NODE_IMAGE
+      type: string
+      default: "registry.ocp4.example.com:8443/ubi9/nodejs-20-minimal:latest"
+      description: Node.js image to use for running npm commands
+
+  steps:
+    - name: npm-run
+      image: $(params.NODE_IMAGE)
+      workingDir: $(workspaces.source.path)/$(params.CONTEXT)
+      script: |
+        #!/usr/bin/env bash
+        set -e
+        npm $(params.ARGS)
+      env:
+        - name: CI
+          value: "true"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532

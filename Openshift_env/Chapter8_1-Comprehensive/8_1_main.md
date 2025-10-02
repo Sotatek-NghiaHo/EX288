@@ -28,3 +28,13 @@ drwxr-xr-x. 3 student student 162 Sep 29 03:42 templates
 ```
 
 ![alt text](pic/2.png)
+
+create-frontendspa.sh
+
+![alt text](pic/3.png)
+
+![alt text](pic/4.png)
+
+
+
+

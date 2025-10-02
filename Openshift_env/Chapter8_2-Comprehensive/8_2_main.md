@@ -32,3 +32,8 @@ tkn task list
 oc get task buildah -n openshift-pipelines -o yaml > buildah-task.yaml
 ```
 
+```
+npm install --no-package-lock
+```
+
+Nó giúp cài dependencies mà không tạo file package-lock.json (hữu ích trong CI/CD khi bạn không muốn lock version).
