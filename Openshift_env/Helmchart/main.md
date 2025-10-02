@@ -260,6 +260,7 @@ Triển khai ở đâu	|Cluster (OpenShift, K8s)
 Mục tiêu	|Dễ thử nghiệm, deploy nhanh 1 bản cụ thể
 Quản lý version	|Helm lưu history release (rollback được)
 Không tự động	|Phải tự chạy lệnh khi có code mới
+
 ⚙️ 2. CI/CD (Tekton, Jenkins, GitHub Actions, ArgoCD...) là quy trình tự động
 
 CI/CD là pipeline tự động build → test → deploy.
@@ -291,6 +292,7 @@ Triển khai ở đâu	|Cluster (OpenShift, K8s)
 Mục tiêu	|Tự động hóa build-deploy, giảm lỗi người dùng
 Quản lý version	|Có thể tích hợp Helm, GitOps để version hóa
 Tích hợp kiểm thử|	Có thể thêm bước test, scan, validate
+
 📦 3. Helm trong CI/CD
 
 Thực tế, hai thứ này không đối lập mà phối hợp với nhau:
@@ -316,6 +318,7 @@ Quản lý version	|✅ Có helm rollback	|✅ Theo commit/tag
 Tích hợp test	|❌ Không	|✅ Có thể thêm
 Dành cho	|DevOps thao tác nhanh	|Doanh nghiệp, team dev nhiều người
 Mục tiêu	|Deploy 1 app nhanh chóng	|Build + test + deploy toàn bộ pipeline
+
 💡 Ví dụ thực tế (Tekton + Helm)
 
 Giả sử bạn có chart: chart/famous-quotes
@@ -456,13 +459,13 @@ oc process -f $(params.APP_PATH)/kubefiles/app.yaml \
 ```
 🔹 Nghĩa là gì:
 
-oc process -f app.yaml → render file app.yaml (template của OpenShift)
+- `oc process -f app.yaml` → render file app.yaml (template của OpenShift)
 
--p IMAGE_NAME=... → truyền biến thay thế (giống Helm values)
+- `-p IMAGE_NAME=...` → truyền biến thay thế (giống Helm values)
 
-| oc apply -f - → gửi YAML render ra lên cluster (deploy)
+- `| oc apply -f -` → gửi YAML render ra lên cluster (deploy)
 
-➡️ Đây là kiểu triển khai native của OpenShift, không dùng Helm.
+➡️ Đây là kiểu triển khai native của OpenShift, không dùng Helm.  
 Bạn định nghĩa template kiểu OpenShift, ví dụ:
 ```
 apiVersion: template.openshift.io/v1
@@ -482,7 +485,7 @@ objects:
             image: ${IMAGE_NAME}
 ```
 
-oc process + oc apply = render + deploy (OpenShift native)
+`oc process` + `oc apply` = render + deploy (OpenShift native)
 
 ✅ Ưu điểm:
 
@@ -502,7 +505,7 @@ oc process + oc apply = render + deploy (OpenShift native)
 
 ⛵ 2. Khi nào dùng Helm
 
-Helm là package manager cho Kubernetes/OpenShift.
+Helm là package manager cho Kubernetes/OpenShift.  
 Bạn dùng Helm chart thay cho template .yaml thường.
 
 Ví dụ trong CI/CD (Tekton hoặc Jenkins):
