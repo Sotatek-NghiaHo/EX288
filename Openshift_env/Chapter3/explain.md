@@ -13,8 +13,8 @@ Deploy an application by using the image stream.
 --> Success
 ...output omitted...
 ```
-| Thành phần                       | Giải thích                                                                                                                                                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thành phần | Giải thích  |
+| --- | ---|
 | `oc new-app`                     | Lệnh khởi tạo ứng dụng mới trong OpenShift.                                                                                                                                                                   |
 | `--name custom-server`           | Đặt tên ứng dụng là `custom-server`. Tên này sẽ được dùng cho **DeploymentConfig**, **Service**, và các đối tượng liên quan.                                                                                  |
 | `-i images-review/custom-server` | Dùng image (hoặc ImageStreamTag) làm nền tảng để deploy. Ở đây `images-review/custom-server` nghĩa là: <br>🔹 `images-review`: namespace chứa ImageStream <br>🔹 `custom-server`: tên ImageStream hoặc image. <br> Nếu bạn muốn chỉ rõ tag, có thể viết: `-i images-review/custom-server:1.0.0`|
