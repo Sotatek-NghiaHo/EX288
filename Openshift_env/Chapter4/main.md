@@ -607,7 +607,7 @@ oc new-app nodejs:20-ubi8~https://repo.git
 
 ---
 
-vi du toi dang o trong thu muc rong va chay lenh nay oc new-app nodejs:20-ubi8~https://repo.git  thi dieu gi xay ra trong thu muc nay ko
+vi du toi dang o trong thu muc rong va chay lenh nay `oc new-app nodejs:20-ubi8~https://repo.git ` thi dieu gi xay ra trong thu muc nay ko
 ChatGPT said:
 
 Câu hỏi này rất hay 🔥 — vì nó giúp bạn hiểu rõ hơn oc new-app không hề làm việc gì trong thư mục hiện tại cả, mà toàn bộ quá trình đều diễn ra trong cluster OpenShift, chứ không phải trên máy local.
@@ -615,9 +615,9 @@ Câu hỏi này rất hay 🔥 — vì nó giúp bạn hiểu rõ hơn oc new-ap
 🎯 Tóm tắt nhanh
 
 ❗ Khi bạn chạy:
-
+```
 oc new-app nodejs:20-ubi8~https://repo.git
-
+```
 
 trong một thư mục rỗng hoặc bất kỳ thư mục nào,
 👉 Không có gì thay đổi trên máy local.
@@ -633,16 +633,16 @@ Khi chạy lệnh đó, OpenShift thực hiện chuỗi hành động trên clus
 
 BuildConfig định nghĩa:
 
-Nguồn Git (https://repo.git)
+- Nguồn Git (https://repo.git)
 
-Builder image (nodejs:20-ubi8)
+- Builder image (nodejs:20-ubi8)
 
-Build strategy (Source – tức S2I)
+- Build strategy (Source – tức S2I)
 
-Output image (ImageStream)
+- Output image (ImageStream)
 
 Ví dụ:
-
+```
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -662,74 +662,76 @@ spec:
     to:
       kind: ImageStreamTag
       name: nodejs-demo:latest
-
+```
 🔹 2. Tạo một ImageStream
 
 Lưu trữ image kết quả sau khi build:
-
+```
 oc get is
-
+```
 🔹 3. Tạo một Deployment và Service
 
 Để OpenShift tự deploy và expose app:
-
+```
 oc get deploy
 oc get svc
-
+```
 🔹 4. Tự động start build đầu tiên
 
 OpenShift sẽ chạy 1 build job trong cluster:
-
+```
 oc logs -f build/nodejs-demo-1
-
+```
 
 Build này clone repo từ Git, rồi build trong Pod build, sau đó tạo image.
 
 🔹 5. Kết quả cuối cùng
 
-BuildConfig, ImageStream, Deployment, Service → đều trong cluster
+- BuildConfig, ImageStream, Deployment, Service → đều trong cluster
 
-Thư mục local của bạn vẫn trống như ban đầu
+- Thư mục local của bạn vẫn trống như ban đầu
 
-Bạn không cần có source code local
+- Bạn không cần có source code local
 
 🧭 So sánh nếu bạn muốn build từ local
 
 Nếu bạn muốn dùng code trong thư mục hiện tại, thì bạn cần dùng --binary:
-
+```
 oc new-build nodejs:20-ubi8 --binary --name=myapp
 oc start-build myapp --from-dir=. --follow
-
+```
 
 Lúc này, OpenShift nén toàn bộ thư mục hiện tại và upload lên cluster để build (tức là dùng local code).
 
 ✅ Kết luận:
-Câu hỏi	Trả lời
-Có file nào được tạo trong thư mục local không?	❌ Không
-Code có được clone về local không?	❌ Không
-Mọi thứ diễn ra ở đâu?	✅ Trên cluster OpenShift
-Dùng lệnh nào nếu muốn build local code?	oc new-build --binary + oc start-build --from-dir=.
+| Câu hỏi                                         | Trả lời                                                 |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| Có file nào được tạo trong thư mục local không? | ❌ Không                                                 |
+| Code có được clone về local không?              | ❌ Không                                                 |
+| Mọi thứ diễn ra ở đâu?                          | ✅ Trên **cluster OpenShift**                            |
+| Dùng lệnh nào nếu muốn build local code?        | `oc new-build --binary` + `oc start-build --from-dir=.` |
 
-💡 Tóm lại:
-oc new-app nodejs:20-ubi8~https://repo.git chỉ gửi metadata lên cluster để OpenShift tự clone code từ Git và build trong pod.
+💡 Tóm lại:  
+`oc new-app nodejs:20-ubi8~https://repo.git` chỉ gửi metadata lên cluster để OpenShift tự clone code từ Git và build trong pod.  
 🧱 Thư mục bạn đang đứng không bị ảnh hưởng — nó chỉ là nơi bạn gõ lệnh thôi.
 
 Bạn có muốn mình vẽ cho bạn một sơ đồ dòng chảy (flow diagram) thể hiện rõ khi nào code local dùng, khi nào Git repo được clone bởi cluster không?
 
+---
 You said:
-sao  oc new-app --name expense-service \
+sao  `oc new-app --name expense-service \
 --strategy Docker \
 --context-dir apps/builds-review/expense-service \
-https://git.ocp4.example.com/developer/DO288-apps  toi ll lai co them thu muc target
+https://git.ocp4.example.com/developer/DO288-apps ` toi ll lai co them thu muc target
 ChatGPT said:
 
 Câu hỏi của bạn rất tinh ý 👏 — và đúng là khi bạn dùng lệnh:
-
+```
 oc new-app --name expense-service \
   --strategy Docker \
   --context-dir apps/builds-review/expense-service \
   https://git.ocp4.example.com/developer/DO288-apps
-
+```
 
 thì sau khi build xong, trong image build của cluster (hoặc trong quá trình build), bạn thấy có thêm thư mục target/ — còn trong repo gốc trước đó thì chưa có.
 
@@ -738,9 +740,9 @@ Giờ ta phân tích vì sao có chuyện đó 👇
 🧠 1. Lệnh này dùng Docker strategy, không phải S2I
 
 Bạn đã chọn:
-
+```
 --strategy Docker
-
+```
 
 ➡️ Nghĩa là OpenShift sẽ dùng Dockerfile trong repo của bạn để build image, chứ không dùng builder image S2I.
 
@@ -749,7 +751,7 @@ Bạn đã chọn:
 🧩 2. Trong Dockerfile có lệnh build bằng Maven
 
 Nếu bạn xem lại file Dockerfile trong thư mục đó, nó sẽ có đoạn kiểu như:
-
+```
 FROM registry.access.redhat.com/ubi8/openjdk-17
 
 WORKDIR /app
@@ -761,61 +763,61 @@ COPY src src
 RUN mvn clean package
 
 CMD ["java", "-jar", "target/expense-service-1.0.0-SNAPSHOT-runner.jar"]
-
+```
 
 🔹 Lúc này, trong quá trình build image, OpenShift sẽ:
 
-1️⃣ COPY src src → copy mã nguồn Java vào container build
-2️⃣ RUN mvn clean package → chạy lệnh Maven trong container, để biên dịch code và đóng gói
-3️⃣ Khi Maven chạy xong, nó sinh ra thư mục target/ chứa file .jar
+1️⃣ COPY src src → copy mã nguồn Java vào container build  
+2️⃣ RUN mvn clean package → chạy lệnh Maven trong container, để biên dịch code và đóng gói  
+3️⃣ Khi Maven chạy xong, nó sinh ra thư mục target/ chứa file .jar  
 
 ➡️ Thư mục target/ này chỉ xuất hiện bên trong môi trường build của container, chứ không phải ở repo gốc của bạn.
 
 🧱 3. Vậy tại sao bạn “thấy” được thư mục target/?
 
 Vì bạn có thể đã làm oc debug hoặc xem image build, ví dụ:
-
+```
 oc debug deploy/expense-service
-
+```
 
 rồi trong đó bạn gõ:
-
+```
 ls target/
-
+```
 
 Thì thấy:
-
+```
 classes  expense-service-1.0.0-SNAPSHOT.jar  ...
-
+```
 
 ✅ Đúng, vì container đã build xong app, Maven tạo ra thư mục target/ trong filesystem của image, không liên quan gì đến local workspace của bạn.
 
 ⚙️ 4. Tóm lại dòng thời gian:
 
-1️⃣ Bạn chạy oc new-app --strategy Docker
-2️⃣ OpenShift clone repo → build trong 1 build pod
-3️⃣ Dockerfile chạy mvn clean package
-4️⃣ Maven tạo ra thư mục target/ chứa .jar
-5️⃣ Image build thành công → được lưu vào ImageStream
-6️⃣ Deployment được tạo, chạy container từ image đó
+1️⃣ Bạn chạy oc new-app --strategy Docker  
+2️⃣ OpenShift clone repo → build trong 1 build pod  
+3️⃣ Dockerfile chạy mvn clean package  
+4️⃣ Maven tạo ra thư mục target/ chứa .jar  
+5️⃣ Image build thành công → được lưu vào ImageStream  
+6️⃣ Deployment được tạo, chạy container từ image đó  
 7️⃣ Khi bạn debug vào container, bạn thấy có target/ ✅
 
 🔎 Khác với trường hợp local build
 
 Khi bạn build local bằng Maven:
-
+```
 mvn clean package
-
+```
 
 ➡️ target/ được tạo trong thư mục local của bạn.
 
-Còn khi build trong OpenShift (Docker build):
+Còn khi build trong OpenShift (Docker build):  
 ➡️ target/ được tạo trong container build, không ảnh hưởng đến thư mục local.
 
 ✅ Kết luận
-Câu hỏi	Giải thích
-Vì sao có target/ khi dùng --strategy Docker?	Vì trong Dockerfile có RUN mvn clean package → Maven sinh thư mục target/
-Thư mục đó ở đâu?	Trong container build (hoặc image), không phải thư mục local
-Nếu muốn thấy trên local?	Bạn phải mvn package trên máy bạn
-Khi debug vào pod thấy target/?	Đúng — vì image đã được build chứa thư mục này
-
+| Câu hỏi                                           | Giải thích                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Vì sao có `target/` khi dùng `--strategy Docker`? | Vì trong Dockerfile có `RUN mvn clean package` → Maven sinh thư mục `target/` |
+| Thư mục đó ở đâu?                                 | Trong container build (hoặc image), **không phải thư mục local**              |
+| Nếu muốn thấy trên local?                         | Bạn phải `mvn package` trên máy bạn                                           |
+| Khi debug vào pod thấy `target/`?                 | Đúng — vì image đã được build chứa thư mục này                                |
