@@ -45,6 +45,15 @@ registry-credentials --for=pull
 no output expected
 ```
 
+![alt text](image-1.png)
+
+![alt text](image.png)
+Phần .dockerconfigjson này là một chuỗi base64 của file ~/.docker/config.json, nên nếu bạn chỉnh tay dễ gây lỗi cú pháp hoặc sai encode.  
+-> Cách an toàn: xoá và tạo lại
+```
+oc delete secret registry-credentials
+```
+
 ---
 
 Lệnh bạn đang dùng là để tạo một ImageStream (tên là custom-server) và import một image sẵn có từ registry vào OpenShift — điều này giúp OpenShift theo dõi và quản lý version của image thông qua ImageStream tag.
@@ -68,6 +77,9 @@ oc import-image <imagestream-name> \
   [--confirm] \
   [--scheduled=true]
 ```
+
+![alt text](image-2.png)
+
 🔍 Giải thích từng phần trong lệnh của bạn:
 ```
 oc import-image custom-server --confirm \

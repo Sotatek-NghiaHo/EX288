@@ -531,15 +531,15 @@ oc new-app nodejs:20-ubi8~https://github.com/user/nodejs-demo.git
 
 Đúng — cả hai đều sẽ sinh ra:
 
-BuildConfig → strategy: Source
+- BuildConfig → strategy: Source
 
-ImageStream → myapp:latest
+- ImageStream → myapp:latest
 
-Deployment
+- Deployment
 
-Service
+- Service
 
-Và tự động chạy build đầu tiên (build/myapp-1)
+- Và tự động chạy build đầu tiên (build/myapp-1)
 
 📦 Kết quả cuối cùng là: image chứa ứng dụng Node.js build từ source code
 
@@ -582,7 +582,7 @@ builderImage~https://gitrepo
 ```
 nghĩa là:
 
-“Dùng builderImage này để build từ source code ở gitrepo”.
+> “Dùng builderImage này để build từ source code ở gitrepo”.
 
 Đây là cú pháp đặc biệt của oc new-app dành riêng cho S2I builds.
 

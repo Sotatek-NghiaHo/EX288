@@ -445,6 +445,235 @@ helm install myapp path/to/chart	|Đường dẫn cụ thể	|Khi chart ở nơi
 
 ---
 
+Kustomize là gì?
+
+Kustomize là một công cụ quản lý cấu hình Kubernetes (được tích hợp sẵn trong kubectl và oc), giúp bạn:
+
+- Tạo nhiều phiên bản (staging, production, dev, …) từ một cấu hình gốc (base).
+- Không cần dùng Helm hoặc template engine.
+- Dễ dàng ghi đè (override) các giá trị YAML như image, replicas, resources, labels,...
+
+Cấu trúc thư mục chuẩn
+```
+kustomized-quotes/
+├── base/                      # Cấu hình gốc (dùng chung cho mọi môi trường)
+│   └── app.yaml
+|   └── kustomization.yaml
+└── overlays/                  # Các bản tùy chỉnh theo môi trường
+    ├── staging/
+    │   ├── kustomization.yaml
+    │   └── staging_dimensioning.yaml
+    └── production/
+        ├── kustomization.yaml
+        └── prod_dimensioning.yaml
+```
+
+3. File kustomization.yaml là gì?
+
+Đây là file bắt buộc mà Kustomize cần để biết:
+
+- Base nào được sử dụng
+
+- File nào cần patch (ghi đè)
+
+- Metadata nào cần thêm
+
+Ví dụ:
+
+`overlays/staging/kustomization.yaml`
+```
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - staging_dimensioning.yaml
+
+namePrefix: staging-
+namespace: staging
+```
+
+`overlays/production/kustomization.yaml`
+```
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - prod_dimensioning.yaml
+
+namePrefix: prod-
+namespace: production
+```
+
+🧩 1. `namePrefix` là gì?
+
+`namePrefix` là tùy chọn trong file `kustomization.yaml` dùng để tự động thêm tiền tố (prefix) vào tên của tất cả tài nguyên (resources) trong file `base`.
+
+🧠 2. Cú pháp:
+```
+namePrefix: <prefix-text>
+```
+
+Ví dụ:
+```
+namePrefix: staging-
+```
+🧱 3. Cách hoạt động:
+
+Nếu trong base/app.yaml có:
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: famous-quotes
+```
+
+và trong `overlays/staging/kustomization.yaml` bạn viết:
+```
+resources:
+  - ../../base
+namePrefix: staging-
+```
+
+➡️ Kustomize sẽ tự động đổi tên resource đó khi build:
+```
+metadata:
+  name: staging-famous-quotes
+```
+
+1. Cấu trúc thư mục (đúng mẫu chuẩn)
+```
+kustomized-quotes/
+├── base
+│   ├── app.yaml
+│   └── kustomization.yaml
+└── overlays
+    ├── staging
+    │   ├── kustomization.yaml
+    │   └── staging_dimensioning.yaml
+    └── production
+        ├── kustomization.yaml
+        └── prod_dimensioning.yaml
+```
+📄 2. Nội dung mẫu của từng file
+🧩 `base/app.yaml`
+
+Đây là cấu hình gốc, dùng chung cho mọi môi trường.
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: famous-quotes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: famous-quotes
+  template:
+    metadata:
+      labels:
+        app: famous-quotes
+    spec:
+      containers:
+        - name: quotes
+          image: quay.io/redhattraining/famous-quotes:latest
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: famous-quotes
+spec:
+  selector:
+    app: famous-quotes
+  ports:
+    - port: 80
+      targetPort: 8080
+```
+🧩 base/kustomization.yaml
+
+File này định nghĩa nội dung “base” mà mọi môi trường có thể kế thừa.
+```
+resources:
+  - app.yaml
+```
+🧩 `overlays/staging/staging_dimensioning.yaml`
+
+Patch để thay đổi cấu hình phù hợp cho môi trường staging (ví dụ tăng replicas, đổi tag image,…)
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: famous-quotes
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: quotes
+          image: quay.io/redhattraining/famous-quotes:staging
+```
+🧩 `overlays/staging/kustomization.yaml`
+
+File chính của môi trường staging — chỉ rõ base và patch nào được dùng.
+```
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - staging_dimensioning.yaml
+
+namePrefix: staging-
+namespace: staging
+```
+🧩 overlays/production/prod_dimensioning.yaml
+
+Patch cho production (replicas nhiều hơn, dùng image khác,...)
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: famous-quotes
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+        - name: quotes
+          image: quay.io/redhattraining/famous-quotes:prod
+```
+🧩 `overlays/production/kustomization.yaml`
+
+Giống staging, nhưng cho môi trường production.
+```
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - prod_dimensioning.yaml
+
+namePrefix: prod-
+namespace: production
+```
+⚙️ 3. Khi chạy lệnh:
+`oc apply -k overlays/staging`
+
+👉 Các bước diễn ra:
+
+| Bước | Diễn giải                                                | Kết quả                                         |
+| ---- | -------------------------------------------------------- | ----------------------------------------------- |
+| 1️⃣  | Kustomize đọc file `overlays/staging/kustomization.yaml` | Biết rằng base là `../../base`                  |
+| 2️⃣  | Nạp nội dung từ `base/app.yaml`                          | Deployment + Service gốc được load              |
+| 3️⃣  | Áp dụng patch `staging_dimensioning.yaml`                | Thay đổi replicas=2, image=staging              |
+| 4️⃣  | Thêm prefix `staging-` và namespace `staging`            | Tên resource thành `staging-famous-quotes`      |
+| 5️⃣  | Sinh YAML hoàn chỉnh (gộp base + patch)                  | YAML hợp nhất cuối cùng                         |
+| 6️⃣  | `oc apply` gửi YAML này lên API server                   | Tạo/Update tài nguyên trong namespace `staging` |
+
+
+
+
+
+
 
 
 
