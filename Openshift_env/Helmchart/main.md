@@ -669,6 +669,59 @@ namespace: production
 | 5️⃣  | Sinh YAML hoàn chỉnh (gộp base + patch)                  | YAML hợp nhất cuối cùng                         |
 | 6️⃣  | `oc apply` gửi YAML này lên API server                   | Tạo/Update tài nguyên trong namespace `staging` |
 
+---
+
+Câu hỏi rất hay — lệnh `helm template` là một trong những lệnh quan trọng nhất của Helm, đặc biệt khi bạn muốn xem nội dung YAML thực tế mà Helm sẽ apply lên Kubernetes — mà không thực sự cài đặt (deploy) gì cả.
+
+| Thành phần                    | Giải thích ngắn gọn                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| **Lệnh**                      | `helm template`                                                              |
+| **Chức năng chính**           | Render (biên dịch) các file **Helm chart** thành **manifest YAML thuần túy** |
+| **Không áp dụng lên cluster** | ✅ Chỉ tạo file YAML, không gọi `kubectl apply`                               |
+| **Mục đích**                  | Kiểm tra, debug, hoặc xuất YAML để review trước khi deploy                   |
+
+Cú pháp cơ bản
+```
+helm template [RELEASE_NAME] [CHART_PATH] [flags]
+```
+Các tùy chọn phổ biến của helm template
+
+| **Tùy chọn (Option)**    | **Mô tả / Chức năng**                                           | **Ví dụ minh họa**                                              |
+| ------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------- |
+| `-f, --values <file>`    | Chỉ định file chứa giá trị (thay cho `values.yaml`)             | `helm template myapp ./chart -f custom-values.yaml`             |
+| `--set key=value`        | Ghi đè giá trị trực tiếp trên dòng lệnh                         | `helm template myapp ./chart --set image.tag=v2`                |
+| `--set-file key=path`    | Ghi đè giá trị bằng nội dung từ file                            | `helm template myapp ./chart --set-file config=app.conf`        |
+| `--set-string key=value` | Ép kiểu giá trị thành chuỗi (ngăn Helm hiểu nhầm kiểu dữ liệu)  | `helm template myapp ./chart --set-string version=01`           |
+| `--output-dir <dir>`     | Lưu YAML được render vào thư mục chỉ định (chia theo resource)  | `helm template myapp ./chart --output-dir ./rendered`           |
+| `--namespace <ns>`       | Chỉ định namespace cho manifest được tạo ra                     | `helm template myapp ./chart --namespace test-ns`               |
+| `--show-only <file>`     | Chỉ render một template cụ thể trong chart                      | `helm template myapp ./chart --show-only templates/deploy.yaml` |
+| `--api-versions <list>`  | Cung cấp thêm API version khi render (hữu ích khi kiểm tra CRD) | `helm template myapp ./chart --api-versions=apps/v1`            |
+| `--include-crds`         | Bao gồm cả **CRDs** (CustomResourceDefinition) trong kết quả    | `helm template myapp ./chart --include-crds`                    |
+| `--release-name`         | Buộc Helm sử dụng tên release trong manifest                    | `helm template myapp ./chart --release-name`                    |
+| `--version <ver>`        | Chọn phiên bản chart cụ thể (khi dùng chart từ repo)            | `helm template myapp bitnami/nginx --version 15.1.0`            |
+| `--debug`                | Hiển thị thêm thông tin debug khi render                        | `helm template myapp ./chart --debug`                           |
+| `--kube-version <ver>`   | Giả lập phiên bản Kubernetes cụ thể (để kiểm thử)               | `helm template myapp ./chart --kube-version 1.29`               |
+| `--validate`             | Kiểm tra manifest với API của Kubernetes (nếu có cluster)       | `helm template myapp ./chart --validate`                        |
+
+Dưới đây là bảng so sánh ngắn gọn giữa helm install và helm upgrade 👇
+
+| Lệnh | Mục đích  | Khi nào dùng | Cú pháp cơ bản | Các option hay dùng | Ghi chú |
+| ------------------ | ---------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **`helm install`** | Cài đặt **chart mới** vào Kubernetes (tạo một release mới) | Khi **chưa có release** nào với tên đó               | `helm install <release_name> <chart> [flags]` | `--values` / `-f`: chỉ định file values<br>`--set`: ghi đè giá trị trực tiếp<br>`--namespace`: chọn namespace<br>`--create-namespace`: tự tạo namespace nếu chưa có<br>`--dry-run`: kiểm tra trước khi cài                                                             | Nếu tên release đã tồn tại → lỗi             |
+| **`helm upgrade`** | **Cập nhật** một release đã có bằng chart hoặc values mới  | Khi **đã cài đặt release** trước đó và muốn cập nhật | `helm upgrade <release_name> <chart> [flags]` | `--install`: nếu release chưa có thì tự động cài (kết hợp install + upgrade)<br>`--values` / `-f`: file values mới<br>`--set`: ghi đè giá trị<br>`--reuse-values`: giữ nguyên giá trị cũ, chỉ thay đổi phần được cập nhật<br>`--force`: ép xóa và cài lại các resource | Dùng để nâng cấp version hoặc cấu hình chart |
+
+
+👉 Tóm tắt dễ nhớ:
+
+- helm install: tạo mới
+- helm upgrade: cập nhật cái đã có
+- helm upgrade --install: tự động “cài nếu chưa có, cập nhật nếu đã có”
+
+---
+
+
+
+
 
 
 

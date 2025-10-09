@@ -65,6 +65,27 @@ Nếu bạn chỉ muốn build ứng dụng `expense-service`, bạn phải ch�
 --context-dir apps/builds-review/expense-service
 ```
 
+💡 Giải thích: `--context-dir`
+
+- Tham số --context-dir dùng để chỉ đường dẫn đến thư mục chứa Dockerfile trong repository Git.
+- Đường dẫn này tính từ root của repo Git, không phải từ nơi bạn đang đứng trên máy local.
+- OpenShift clone toàn bộ repo rồi cd vào --context-dir trong đó để tìm Dockerfile.
+
+Thì:
+
+1. OpenShift sẽ clone repo từ URL `https://git.ocp4.example.com/developer/DO288-apps`
+→ giống như bạn chạy `git clone https://git.ocp4.example.com/developer/DO288-apps`
+
+2. Sau đó, OpenShift `“cd”` vào thư mục con trong repo mà bạn chỉ định bằng `--context-dir`
+→ ở đây là `apps/builds-review/expense-service`
+
+3. Rồi nó tìm Dockerfile ở đó để build image.
+
+⚠️ Điểm quan trọng
+
+> --context-dir là đường dẫn bên trong repo Git, không phải đường dẫn trên máy local của bạn.
+
+
 ➡️ Nghĩa là: “Trong repo này, thư mục cần build nằm ở `apps/builds-review/expense-service`”.
 
 ![alt text](image-3.png)
