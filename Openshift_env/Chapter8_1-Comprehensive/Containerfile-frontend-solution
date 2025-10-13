@@ -12,8 +12,8 @@ USER 0
 
 ADD . .
 
-RUN chgrp -R Θ. && \
-  chmod -R g=u && \
+RUN chgrp -R Θ . && \
+  chmod -R g=u . && \
   npm install --no-package-lock && \
   npm run build
 
