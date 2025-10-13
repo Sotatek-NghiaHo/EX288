@@ -379,6 +379,26 @@ oc get configmap my-config -o yaml
 | `--from-env-file=.env`     | Nạp nhiều key-value từ file env | Dễ quản lý môi trường       |
 
 
+---
+# Creating an Application from a Template
+
+| Lệnh            | Chức năng                           | Tạo tài nguyên?   |
+| --------------- | ----------------------------------- | ----------------- |
+| `oc new-app`    | Xử lý + tạo app từ template         | ✅ Có             |
+| `oc process`    | Chỉ xử lý template (xuất JSON/YAML) | ❌ Không          |
+
+```
+# hoặc nếu template có sẵn trong cluster:
+oc new-app --template=mysql-persistent \
+  -p MYSQL_USER=student -p MYSQL_PASSWORD=mypass
+
+# ➡️ Chỉ xử lý template → xuất ra danh sách tài nguyên (chưa tạo).
+oc process -f mytemplate.yaml -p PARAM1=value1 -p PARAM2=value2 > myresourcelist.json
+
+# ➡️ Process template và tạo tài nguyên ngay trong 1 lệnh:
+oc process -f mytemplate.yaml -p PARAM1=value1 -p PARAM2=value2 | oc create -f -
+
+```
 
 
 

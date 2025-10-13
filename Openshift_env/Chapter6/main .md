@@ -104,8 +104,110 @@ enabled: false
 | Kết quả              | Ứng dụng tự import dữ liệu khi khởi động               | Ứng dụng chạy bình thường, không import |
 
 
+---
+# Kustommization
+Add the required files to the `kustomized-quotes` directory to have working staging and production customizations for the `famous-quotes` application.
 
+The `~/DO288/labs/multicontainer-review/kustomized-quotes` directory contains the base and overlays directory convention, but is missing some files that Kustomize requires.
+```
+kustomized-quotes
+├── base
+│   └── app.yaml # Generated in the Helm part of the exercise
+└── overlays
+    ├── production
+    │   └── prod_dimensioning.yaml
+    └── staging
+        └── staging_dimensioning.yaml
+```
+Change to the kustomized-quotes directory.
+```
+[student@workstation famous-quotes]$ cd \
+~/DO288/labs/multicontainer-review/kustomized-quotes
+```
+Create the base/kustomization.yaml file with the following content:
+```
+resources:
+- app.yaml
+```
+Verify that you can run oc kustomize with the base directory.
+```
+[student@workstation kustomized-quotes]$ oc kustomize base/
+apiVersion: v1
+data:
+  import_quotes.csv: |-
+...output omitted...
+```
+Create the overlays/staging/kustomization.yaml file with the following content:
+```
+resources:
+- ../../base
+patches:
+- path: staging_dimensioning.yaml
+```
+Verify that you can run oc kustomize with the overlays/staging directory.
+```
+[student@workstation kustomized-quotes]$ oc kustomize overlays/staging
+apiVersion: v1
+data:
+  import_quotes.csv: |-
+    id|quote|author
+...output omitted...
+```
+Create the overlays/production/kustomization.yaml file with the following content:
+```
+resources:
+- ../../base
+patches:
+- path: prod_dimensioning.yaml
+```
+Verify that you can run oc kustomize with the overlays/production directory.
+```
+[student@workstation kustomized-quotes]$ oc kustomize overlays/production
+apiVersion: v1
+data:
+  import_quotes.csv: |-
+    id|quote|author
+...output omitted...
+```
+Verify the directory structure.
+```
+[student@workstation kustomized-quotes]$ tree ./
+./
+├── base
+│   ├── app.yaml
+│   └── kustomization.yaml
+└── overlays
+    ├── production
+    │   ├── kustomization.yaml
+    │   └── prod_dimensioning.yaml
+    └── staging
+        ├── kustomization.yaml
+        └── staging_dimensioning.yaml
+```
+4 directories, 6 files
+Deploy the staging version of the application.
 
+Run the following command to deploy the staging version of the application.
+```
+[student@workstation kustomized-quotes]$ oc apply -k overlays/staging
+```
+Verify that the application and the Redis pods are running.
+```
+[student@workstation kustomized-quotes]$ oc get pod
+NAME                            READY   STATUS      RESTARTS      AGE
+famous-quotes-d64ffc75f-kwzgw   1/1     Running     2 (36s ago)   59s
+quotes-store-1-deploy           0/1     Completed   0             58s
+quotes-store-1-sjv7p            1/1     Running     0             55s
+```
+Use the curl command to test that the application works.
+```
+[student@workstation kustomized-quotes]$ curl \
+famous-quotes-multicontainer-review.apps.ocp4.example.com/quotes/5
+{
+  "quote" : "Imagination is more important than knowledge.",
+  "author" : "Albert Einstein",
+  "_links" : {
+```
 
 
 
