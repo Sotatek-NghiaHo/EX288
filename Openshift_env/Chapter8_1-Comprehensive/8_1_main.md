@@ -168,3 +168,26 @@ helm template todo-list .
 → Xem YAML sinh ra indent đúng chưa
 
 
+---
+
+🧩 1. Gỡ bỏ release Helm (cách chính thống)
+```
+helm uninstall myapp
+```
+✅ Kết quả:
+
+Helm xóa tất cả resource (Deployment, Service, Route, v.v.) do chart tạo ra.
+
+Helm cũng xóa Helm release metadata trong cluster (trong ConfigMap hoặc Secret).
+
+Namespace và PVC (nếu có persistentVolumeClaim) không bị xóa mặc định.
+
+Rồi cài lại:
+```
+helm upgrade --install todo-list ./todo-list-chart
+```
+
+![alt text](image.png)
+
+
+![alt text](image-1.png)

@@ -181,6 +181,32 @@ spec:
 ```
 
 
+```
+oc apply -f basic-user-pass.yaml
+
+oc secret link pipeline basic-user-pass
+```
+
+| Thành phần                                 | Ý nghĩa                                                                                                  |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `pipeline`                                 | Service Account mặc định mà Tekton Pipelines sử dụng để chạy tasks.                                      |
+| `oc secrets link pipeline basic-user-pass` | Gắn secret vào service account đó để nó có quyền truy cập vào registry hoặc các tài nguyên cần xác thực. |
+
+Nó liên kết (link) secret basic-user-pass với service account có tên pipeline.
+
+
+---
+```
+tkn pipeline start --use-param-defaults words-cicd-pipeline -p APP_PATH=apps/compreview-cicd/words -w name=shared, volumeClaimTemplateFile=volume-template.yaml
+```
+
+| Mục                                       | Ý nghĩa                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| Lệnh `tkn pipeline start`                 | Dùng để **chạy pipeline** mà không cần tạo PipelineRun YAML thủ công.              |
+| `--use-param-defaults`                    | Sử dụng các giá trị default trong pipeline.yaml.                                   |
+| `-p APP_PATH=...`                         | Truyền giá trị bắt buộc duy nhất theo yêu cầu đề.                                  |
+| `-w name=...,volumeClaimTemplateFile=...` | Khai báo workspace volume tạm (PVC template file examiner cho).                    |
+| ⇒ Tổng thể                                | Chính là **cách chạy pipeline được yêu cầu trong đề** thay cho file `PipelineRun`. |
 
 
 
