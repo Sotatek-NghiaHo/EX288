@@ -917,10 +917,126 @@ Service quotes-api (DNS nội bộ: quotes-api:8080)
 Pod quotes-api
 ```
 
+# 9.2 
+## 🧭 Mục tiêu của bài
 
+Bạn cần:
 
+1. Tạo 2 mạng Podman (`beeper-backend` và `beeper-frontend`).
+2. Chạy container **PostgreSQL** (database).
+3. Tạo **multi-stage build image** cho Beeper API (Java + Maven).
+4. Tạo **multi-stage build image** cho Beeper UI (Node + Nginx).
+5. Chạy 2 container ứng dụng (API và UI).
+6. Kết nối đúng mạng, port, volume và biến môi trường.
 
+---
 
+## 🪜 Tổng quan cách làm (tóm tắt nhanh)
+
+1. **Tạo networks**
+2. **Chạy database container + volume**
+3. **Tạo Dockerfile cho API** → build image
+4. **Chạy container API**
+5. **Tạo Dockerfile cho UI** → build image
+6. **Chạy container UI**
+7. **Kiểm tra UI ở [http://localhost:8080](http://localhost:8080/)**
+
+![alt text](image-6.png)
+
+Create the beeper-backend and beeper-frontend Podman networks.
+
+Create the beeper-backend Podman network.
+```
+[student@workstation ~]$ podman network create beeper-backend
+beeper-backend
+```
+Create the beeper-frontend Podman network.
+```
+[student@workstation ~]$ podman network create beeper-frontend
+beeper-frontend
+```
+Create the database container with an attached volume for persistence.
+
+Create the beeper-data volume.
+```
+[student@workstation ~]$ podman volume create beeper-data
+beeper-data
+```
+Create the PostgreSQL container with beeper-db as the name. Mount the beeper-data volume to the /var/lib/pgsql/data directory in the container.
+```
+[student@workstation ~]$ podman run -d --name beeper-db \
+  -e POSTGRESQL_USER=beeper \
+  -e POSTGRESQL_PASSWORD=beeper123 \
+  -e POSTGRESQL_DATABASE=beeper \
+  -v beeper-data:/var/lib/pgsql/data --net beeper-backend \
+  registry.ocp4.example.com:8443/rhel9/postgresql-13:1
+...output omitted...
+611...f27
+```
+Create a container for the Beeper API by using a custom Containerfile. The application is available at the /home/student/DO188/labs/comprehensive-review/beeper-backend directory.
+
+Go to the application directory.
+```
+[student@workstation ~]$ cd ~/DO188/labs/comprehensive-review/beeper-backend
+```
+Create a Containerfile file with the following contents:
+```
+FROM registry.ocp4.example.com:8443/ubi8/openjdk-17:1.12 as builder
+COPY --chown=jboss . .
+RUN mvn -s settings.xml package
+
+FROM registry.ocp4.example.com:8443/ubi8/openjdk-17-runtime:1.12
+COPY --from=builder /home/jboss/target/beeper-1.0.0.jar .
+ENTRYPOINT ["java", "-jar", "beeper-1.0.0.jar"]
+```
+Build a container image for the API and use beeper-api:v1 as the tag.
+```
+[student@workstation beeper-backend]$ podman build -t beeper-api:v1 .
+...output omitted...
+Successfully tagged localhost/beeper-api:v1
+28d...d95
+```
+Create a container that matches the specifications for the Beeper API by using the tag built in the previous step.
+```
+[student@workstation beeper-backend]$ podman run -d \
+  --name beeper-api --net beeper-backend,beeper-frontend \
+  -e DB_HOST=beeper-db beeper-api:v1
+ab4...2ef
+```
+Create a container for the Beeper UI by using a custom Containerfile. The application is available at the /home/student/DO188/labs/comprehensive-review/beeper-ui directory.
+
+Go to the application directory.
+```
+[student@workstation beeper-backend]$ cd \
+  ~/DO188/labs/comprehensive-review/beeper-ui
+```
+Create a Containerfile file with the following contents:
+```
+FROM registry.ocp4.example.com:8443/ubi9/nodejs-22:1 AS builder
+USER root
+COPY . .
+RUN npm install && \
+    npm run build
+```
+FROM registry.ocp4.example.com:8443/ubi8/nginx-118:1
+COPY nginx.conf /etc/nginx/
+COPY --from=builder /opt/app-root/src/dist /usr/share/nginx/html
+CMD nginx -g "daemon off;"
+Build a container image for the UI and use beeper-ui:v1 as the tag.
+```
+[student@workstation beeper-ui]$ podman build -t beeper-ui:v1 .
+...output omitted...
+Successfully tagged localhost/beeper-ui:v1
+7fd...ee1
+```
+Create a container that matches the specifications for the UI by using the tag built in the previous step.
+```
+[student@workstation beeper-ui]$ podman run -d \
+  --name beeper-ui --net beeper-frontend \
+  -p 8080:8080 beeper-ui:v1
+620...a5c
+```
+Optionally, access the UI by using a web browser to go to http://localhost:8080. The UI shows the list of user-created messages. To create a new message, click New Beep.
 
 
 
