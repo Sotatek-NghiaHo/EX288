@@ -503,4 +503,57 @@ tkn clustertask describe git-clone
 ❌ Không được đổi tên param.  
 ❌ Không được bỏ param bắt buộc (nếu task không có default).  
 
+---
+Trong câu lệnh Tekton sau:
 
+```bash
+tkn pipeline start words-cicd-pipeline \
+  -w name=shared,volumeClaimTemplateFile=volume-template.yaml
+```
+
+Tham số `volumeClaimTemplateFile=volume-template.yaml` có vai trò **tạo một PersistentVolumeClaim (PVC) tạm thời** từ file YAML `volume-template.yaml` để gán vào workspace `shared` trong pipeline. Đây là cách để pipeline có **bộ nhớ lưu trữ dùng chung giữa các task**.
+
+---
+
+### 📦 Tác dụng của `volumeClaimTemplateFile` trong CI/CD
+
+- **Tạo PVC động**: Tekton sẽ tạo một PVC mới dựa trên template bạn cung cấp.
+- **Gắn vào workspace**: PVC này được gắn vào workspace `shared`, giúp các task trong pipeline có thể đọc/ghi dữ liệu chung.
+- **Tự động xóa sau khi PipelineRun kết thúc**: PVC này là tạm thời, không tồn tại vĩnh viễn.
+
+---
+
+### 📄 Ví dụ nội dung `volume-template.yaml`
+
+```yaml
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs-storage
+  volumeMode: Filesystem
+```
+
+→ Đây là cấu hình yêu cầu một volume 1Gi, có thể đọc/ghi bởi một pod.
+
+---
+
+### 🧠 Khi nào cần dùng?
+
+- Khi các task cần **chia sẻ dữ liệu**: ví dụ task build tạo ra artifact, task deploy cần dùng lại.
+- Khi bạn không muốn tạo PVC thủ công → dùng template để Tekton tự tạo.
+- Khi bạn muốn **tự động hóa hoàn toàn** quá trình CI/CD mà không cần quản lý PVC thủ công.
+
+---
+
+### ✅ Tóm lại:
+
+| Thành phần | Vai trò |
+|------------|--------|
+| `volumeClaimTemplateFile` | Tạo PVC tạm thời từ file YAML |
+| `workspace name=shared` | Gắn PVC vào workspace dùng chung |
+| Dùng trong CI/CD | Để chia sẻ dữ liệu giữa các task |
+
+Nếu bạn muốn mình kiểm tra hoặc tối ưu lại file `volume-template.yaml`, cứ gửi mình nhé.
