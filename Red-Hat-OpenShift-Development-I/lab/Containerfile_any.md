@@ -23,6 +23,16 @@ COPY --from=builder /opt/app-root/src/dist /usr/share/nginx/html
 CMD nginx -g "daemon off;"
 ```
 
+```
+FROM registry.ocp4.example.com:8443/ubi8/openjdk-17:1.12 as builder
+COPY --chown=jboss . .
+RUN mvn -s settings.xml package
+
+FROM registry.ocp4.example.com:8443/ubi8/openjdk-17-runtime:1.12
+COPY --from=builder /home/jboss/target/beeper-1.0.0.jar .
+ENTRYPOINT ["java", "-jar", "beeper-1.0.0.jar"]
+```
+
 # 4.7
 
 - The ./gen_certificates.sh command is included in the provided container.
