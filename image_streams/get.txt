@@ -1,0 +1,17 @@
+#Get is
+oc get is -n openshift
+
+#Get is tags
+oc get istag -n openshift | grep php
+
+#Get infos on image stream and tags
+oc describe is php -n openshift
+
+#Create an is from a container image hosted on external registry
+oc import-image <imagename>[:tag] --confirm --from <external_registry>
+
+#If there is not tls certificate from the external registry
+oc import-image <imagename>[:tag] --confirm --from <external_registry> --insecure
+
+#Add role
+oc policy add-role-to-group  -n <project> system:image-puller  system:serviceaccounts:<second_project>

@@ -1,0 +1,3 @@
+#Same as docker, if a Dockerfile exists in the current directory
+
+podman build . -t <tag>

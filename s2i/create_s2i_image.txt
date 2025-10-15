@@ -1,0 +1,16 @@
+sudo yum install source-to-image
+
+#Create s2i directory structure
+s2i create <image_name> <directory>
+
+#create image with docker build
+docker build -t <builder_image> .
+
+#build app with the builder-image
+s2i build src builder_image tag_name
+
+
+#Location to copy the s2i scripts in the builder image
+/usr/libexec/s2i
+
+COPY ./.s2i/bin/ /usr/libexec/s2i

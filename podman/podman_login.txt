@@ -1,0 +1,17 @@
+#Get the current logged user, if exists
+
+podman login --get-login quay.io
+
+#auth.json directory, used to create a secret for allow openshift to pull the image
+
+/run/user/1000/containers/auth.json
+
+
+#Create a secret for openshift
+
+oc create secret generic quayio --from-file .dockerconfigjson=/run/user/1000/containers/auth.json --type=kubernetes.io/dockerconfigjson
+
+
+#Add the secrets to the default sa for pull
+
+oc secret link default quayio --for pull

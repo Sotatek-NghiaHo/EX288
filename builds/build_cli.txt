@@ -1,0 +1,7 @@
+oc start-build
+oc cancel-build bc/<name>
+oc delete bc/<name>
+
+oc get builds
+
+oc adm prune #for prune delete a completed or failed build

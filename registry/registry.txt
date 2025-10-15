@@ -1,0 +1,23 @@
+#Install docker registry and skopeo
+yum install docker-distribution skopeo
+
+#Enable image deletetion
+sudo vi etc/docker-distribution/registry/config.yml
+
+under storage:
+        delete:
+          enabled: true
+
+#open 5000/tcp --zone=trusted
+#restart docker-distribution service
+
+
+
+#Grant external access to openshift registry
+#login as admin
+
+oc adm policy add-role-to-user system:registry developer #pull
+oc adm policy add-role-to-user system:image-builder developer #push
+
+oc policy add-role-to-group -n <project_from> system:image-puller \
+    system:serviceaccounts:<project_that_want_to_pull>

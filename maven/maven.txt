@@ -1,0 +1,2 @@
+mvn clean fabric8:resource
+mvn fabric8:deploy

@@ -1,0 +1,16 @@
+#trigger build on image change
+oc set triggers bc/<bcname> --from-image=<image>
+
+#trigger build with webhook
+# webhook: gitlab github bitbucket
+oc set triggers bc/<bcname> --from-github
+oc describe bc <bcname>
+
+#remove trigger
+oc set triggers bc/<bcname> --from-image=<image> --remove
+
+#Post build trigger
+oc set build-hook bc/<bcname> --post-commit --command -- 'internal unit test command'
+
+oc set build-hook bc/<bcname> --post-commit --script="curl xxxxx"
+

@@ -1,0 +1,224 @@
+#Create app from template
+oc new-app --template <project>/<template_name> -p <params>=<value>
+
+#test a template file
+oc new-app --dry-run -f <template_file.yml>
+
+#show parameters
+oc process --parameters <template_file.ml>
+
+---
+
+🧩 1️⃣ Tạo ứng dụng từ một template có sẵn trong project
+```
+oc new-app --template <project>/<template_name> -p <PARAM>=<VALUE>
+```
+🔍 Giải thích:
+
+oc new-app: tạo mới một ứng dụng trong OpenShift.
+
+--template: chỉ định bạn muốn tạo app từ một template có sẵn.
+
+<project>/<template_name>: tên của template, kèm theo project chứa template đó.
+
+Ví dụ: myproject/nodejs-template
+
+-p <PARAM>=<VALUE>: truyền giá trị cho các parameters (tham số) mà template yêu cầu.
+
+Có thể truyền nhiều tham số, ví dụ:
+
+-p NAME=myapp -p IMAGE_STREAM=python:3.9
+
+✅ Ví dụ cụ thể:
+```
+oc new-app --template myproject/nodejs-template -p NAME=myapp -p SOURCE_REPOSITORY_URL=https://github.com/myrepo/app.git
+```
+
+→ Lệnh này tạo một ứng dụng Node.js từ template nodejs-template trong project myproject.
+
+🧪 2️⃣ Kiểm tra template file (dry-run, không thực sự tạo)
+```
+oc new-app --dry-run -f <template_file.yml>
+```
+🔍 Giải thích:
+
+--dry-run: chỉ chạy thử, không thực sự tạo resource trong cluster.
+
+-f <template_file.yml>: chỉ định file YAML hoặc JSON chứa định nghĩa template.
+
+🧠 Mục đích:
+→ Dùng để kiểm tra xem template có hợp lệ không, các resource sẽ được tạo ra như thế nào trước khi triển khai thật.
+
+✅ Ví dụ:
+```
+oc new-app --dry-run -f mytemplate.yml
+```
+
+→ In ra danh sách các đối tượng (Deployment, Service, Route, …) mà template sẽ tạo.
+
+📜 3️⃣ Xem các tham số (parameters) trong một template
+```
+oc process --parameters -f <template_file.yml>
+```
+
+Hoặc nếu template đã tồn tại trong OpenShift project:
+```
+oc process --parameters <project>/<template_name>
+```
+🔍 Giải thích:
+
+oc process: xử lý một template, thay các parameters vào file.
+
+--parameters: chỉ hiển thị danh sách các parameter (tên, mô tả, giá trị mặc định, bắt buộc hay không).
+
+-f: chỉ định file template trên máy cục bộ.
+
+✅ Ví dụ:
+```
+oc process --parameters -f nodejs-template.yml
+```
+
+→ Sẽ hiện danh sách như sau:
+```
+NAME                     DESCRIPTION                      VALUE
+NAME                     The name of the application.     myapp
+SOURCE_REPOSITORY_URL    The source code repository.      https://github.com/...
+```
+💡 Tổng hợp nhanh:
+
+| Mục đích                 | Lệnh                                                     | Giải thích                            |
+| ------------------------ | -------------------------------------------------------- | ------------------------------------- |
+| Tạo app từ template      | `oc new-app --template <project>/<template_name> -p ...` | Tạo app mới từ template có sẵn        |
+| Kiểm tra template file   | `oc new-app --dry-run -f <template_file.yml>`            | Xem trước resource sẽ được tạo ra     |
+| Xem danh sách parameters | `oc process --parameters -f <template_file.yml>`         | Liệt kê các tham số có thể truyền vào |
+
+---
+
+Câu hỏi rất hay 👏
+
+Trong lệnh oc new-app hoặc oc process, bạn có thể thấy có lúc dùng:
+```
+-p <PARAM>=<VALUE>
+```
+
+và đôi khi thấy có người viết:
+```
+-e <PARAM>=<VALUE>
+```
+🧩 Sự khác biệt giữa -p và -e
+
+| Cờ (flag) | Dùng cho                  | Ý nghĩa                                                                             | Khi nào dùng                                                                         |
+| --------- | ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `-p`      | **Parameters**            | Truyền **giá trị cho các tham số** (parameters) trong template hoặc file `.yaml`    | Khi bạn muốn gán giá trị cho các `parameters` của template OpenShift                 |
+| `-e`      | **Environment variables** | Truyền **biến môi trường (environment variables)** vào **container** trong ứng dụng | Khi bạn muốn đặt giá trị môi trường trong deployment (VD: `ENV=prod`, `DEBUG=false`) |
+
+💡 Ví dụ minh họa
+1️⃣ Dùng -p (parameters)
+
+Template mytemplate.yml có phần:
+```
+parameters:
+  - name: APP_NAME
+    description: Application name
+    value: myapp
+```
+
+Bạn chạy:
+```
+oc new-app --template=myproject/mytemplate -p APP_NAME=testapp
+```
+
+→ APP_NAME là parameter của template, được thay vào các chỗ tương ứng trong file YAML trước khi tạo resource.
+
+2️⃣ Dùng -e (environment variables)
+
+Giả sử bạn tạo app từ image:
+
+oc new-app python:3.9~https://github.com/example/myapp.git -e DEBUG=true -e API_URL=https://api.example.com
+
+
+→ Ở đây DEBUG và API_URL là environment variables, được đưa vào container của ứng dụng (giống như ENV trong Dockerfile).
+
+🧠 Tóm tắt dễ nhớ:
+
+| Mục đích                                 | Flag | Ví dụ           |
+| ---------------------------------------- | ---- | --------------- |
+| Truyền **tham số** cho template          | `-p` | `-p NAME=myapp` |
+| Truyền **biến môi trường** cho container | `-e` | `-e DEBUG=true` |
+
+Nếu bạn đang dùng template YAML của OpenShift, hầu hết thời gian bạn nên dùng -p.
+Nếu bạn tạo app trực tiếp từ image hoặc source code, thì -e là hợp lý hơn.
+
+
+⚙️ Sự khác biệt giữa oc new-app và oc process
+🔹 1️⃣ oc process: chỉ xử lý template, không tạo gì trong cluster
+```
+oc process -f template.yml -p PARAM=value
+```
+👉 Giải thích:
+
+Mục đích: “Render” (xử lý) file template: thay các giá trị parameters vào các chỗ tương ứng trong template.
+
+Kết quả: In ra YAML hoàn chỉnh của các resource (Deployment, Service, Route, …), nhưng chưa tạo trong cluster.
+
+Thường dùng khi bạn muốn xem hoặc chỉnh trước khi apply.
+
+✅ Ví dụ:
+```
+oc process -f nodejs-template.yml -p NAME=myapp > output.yml
+```
+
+→ File output.yml chứa toàn bộ resource đã được thay thế giá trị, sẵn sàng để apply:
+
+oc apply -f output.yml
+
+🔹 2️⃣ oc new-app: vừa xử lý vừa tạo resource thật
+```
+oc new-app --template=myproject/nodejs-template -p NAME=myapp
+```
+👉 Giải thích:
+
+oc new-app gọi ngầm oc process bên trong, rồi gửi kết quả lên API server để tạo các resource thật (Deployment, Service, Route...).
+
+Nó là bước tự động hóa cao hơn so với oc process.
+
+✅ Ví dụ:
+oc new-app --template=myproject/nodejs-template -p NAME=myapp
+
+
+→ OpenShift sẽ:
+
+Lấy template nodejs-template
+
+Thay các parameters vào
+
+Tạo resource thật trong cluster (Deployment, Service, Route, v.v.)
+
+💡 So sánh nhanh:
+
+| Mục đích                            | Lệnh         | Kết quả                    | Ghi chú                                    |
+| ----------------------------------- | ------------ | -------------------------- | ------------------------------------------ |
+| Xử lý template để xem trước         | `oc process` | Xuất YAML                  | Không tạo resource                         |
+| Tạo app thật từ template hoặc image | `oc new-app` | Tạo resource trong cluster | Có thể dùng template, image, hoặc git repo |
+
+⚡ Kết hợp cả hai
+
+Nếu bạn muốn kiểm tra trước khi tạo, có thể kết hợp:
+```
+oc process -f template.yml -p NAME=myapp | oc apply -f -
+```
+
+Hoặc dùng --dry-run trong oc new-app:
+
+oc new-app --template=myproject/nodejs-template -p NAME=myapp --dry-run
+
+
+Tóm gọn:
+
+🧠 oc process = “Chuẩn bị” YAML
+🚀 oc new-app = “Tạo app thật” (dựa trên YAML đó)
+
+
+
+
+

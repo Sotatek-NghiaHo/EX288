@@ -1,0 +1,8 @@
+#remove dc trigger for preventing re-deployment after every config change
+oc set triggers dc/mysql --from-config --remove
+
+oc edit dc <dcname>
+
+spec:
+  strategy:
+    type: Recreate | Rolling

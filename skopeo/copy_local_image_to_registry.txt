@@ -1,0 +1,191 @@
+#skopeo copy containers-storate:/<image:tag> docker://quay.io/<username>/<image:tag>
+
+skopeo copy containers-storage:localhost/ubi-sleep:latest docker://quay.io/valentinouberti/ubi-sleep:1.0
+
+---
+
+
+🧩 Cú pháp tổng quát
+```
+skopeo copy <SOURCE> <DESTINATION>
+```
+
+→ Dùng để copy image từ nguồn (source) sang đích (destination).
+
+🔹 Giải thích từng phần trong ví dụ của bạn
+skopeo copy containers-storage:localhost/ubi-sleep:latest docker://quay.io/valentinouberti/ubi-sleep:1.0
+
+1️⃣ containers-storage:localhost/ubi-sleep:latest
+
+Đây là nguồn (source).
+
+containers-storage: nghĩa là image nằm trong local container storage (ví dụ như Podman hoặc Buildah đang dùng).
+
+Tức là image này đã được build hoặc pull về local trước đó, ví dụ bằng podman build hay podman pull.
+
+localhost/ubi-sleep:latest là tên và tag của image local.
+→ Ví dụ image ubi-sleep:latest đang có sẵn trên máy bạn.
+
+2️⃣ docker://quay.io/valentinouberti/ubi-sleep:1.0
+
+Đây là đích (destination).
+
+docker:// nghĩa là đẩy (push) đến một Docker registry (giống như Docker Hub, Quay.io, Harbor, v.v.).
+
+quay.io/valentinouberti/ubi-sleep:1.0 là repository và tag mới sẽ xuất hiện trên Quay.io.
+
+→ Tức là bạn đang đẩy image từ local storage lên remote registry Quay.io.
+
+💡 Tóm tắt dễ hiểu
+
+| Thành phần                              | Ý nghĩa                                   |
+| --------------------------------------- | ----------------------------------------- |
+| `skopeo copy`                           | Sao chép image giữa các nguồn khác nhau   |
+| `containers-storage:`                   | Nguồn là local storage của Podman/Buildah |
+| `docker://`                             | Đích là Docker registry                   |
+| `ubi-sleep:latest`                      | Tên và tag của image local                |
+| `quay.io/valentinouberti/ubi-sleep:1.0` | Repository và tag mới trên Quay.io        |
+
+✅ Kết quả của lệnh này
+
+Sau khi chạy xong:
+
+Image ubi-sleep:latest trên local sẽ được upload lên Quay.io.
+
+Trên Quay.io, bạn sẽ thấy một image mới tên:
+
+quay.io/valentinouberti/ubi-sleep:1.0
+
+🔐 Lưu ý về authentication
+
+Trước khi push, bạn cần đăng nhập vào Quay.io:
+```
+podman login quay.io
+```
+
+hoặc
+```
+skopeo login quay.io
+```
+
+→ Nếu không, bạn sẽ bị lỗi unauthorized: access to the requested resource is not authorized.
+
+🧠 Mẹo thêm
+
+skopeo cực kỳ mạnh vì nó có thể copy image giữa nhiều “scheme” khác nhau:
+
+| Scheme                | Ý nghĩa                                                 |
+| --------------------- | ------------------------------------------------------- |
+| `docker://`           | Docker/OCI registry (Docker Hub, Quay.io, Harbor, etc.) |
+| `containers-storage:` | Local Podman/Buildah storage                            |
+| `dir:`                | Copy vào thư mục local                                  |
+| `oci:`                | Copy vào định dạng OCI (Open Container Initiative)      |
+| `docker-archive:`     | Copy từ file `.tar` do `docker save` tạo ra             |
+
+Ví dụ:
+```
+# Copy từ Docker Hub sang Quay.io mà không cần pull
+skopeo copy docker://docker.io/library/nginx:latest docker://quay.io/myuser/nginx:latest
+```
+
+→ Không cần load hay run container — skopeo xử lý trực tiếp giữa 2 registry!
+
+👉 Tóm lại, lệnh của bạn:
+```
+skopeo copy containers-storage:localhost/ubi-sleep:latest docker://quay.io/valentinouberti/ubi-sleep:1.0
+```
+
+> nghĩa là:
+
+"Đẩy image ubi-sleep:latest từ local storage của Podman lên registry Quay.io (user valentinouberti), tag lại là 1.0."
+
+---
+
+🧩 1️⃣ Nếu bạn đã podman login, thì:
+
+Bạn hoàn toàn có thể:
+```
+podman tag localhost/ubi-sleep:latest quay.io/valentinouberti/ubi-sleep:1.0
+podman push quay.io/valentinouberti/ubi-sleep:1.0
+```
+👉 Điều gì xảy ra:
+
+podman tag chỉ tạo thêm một “nhãn” (alias) trỏ đến cùng image ID trong local storage.
+→ Không tạo bản copy, chỉ thêm một tag mới.
+
+podman push sẽ đẩy image đó lên registry (ở đây là Quay.io), giống hệt với những gì skopeo copy làm.
+
+✅ Kết quả: Image được upload lên Quay.io với tag 1.0.
+
+🔍 2️⃣ Vậy khác gì với skopeo copy?
+
+| Tính năng                                       | `podman push`                            | `skopeo copy`                                            |
+| ----------------------------------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| **Yêu cầu local image**                         | ✅ Có (phải tồn tại trong Podman storage) | ⚙️ Không cần (có thể copy giữa 2 remote registry luôn)   |
+| **Cần login trước**                             | ✅ `podman login`                         | ✅ `skopeo login` hoặc `podman login`                     |
+| **Copy giữa registry → registry**               | ❌ Không (chỉ push từ local)              | ✅ Có thể (ví dụ Docker Hub → Quay.io)                    |
+| **Copy giữa nhiều storage backend**             | ❌ Giới hạn (chỉ Podman → registry)       | ✅ Rất linh hoạt (`docker://`, `dir:`, `oci:`, `tar:`...) |
+| **Có thể chạy trong CI/CD mà không cần daemon** | 🚫 Không                                 | ✅ Có (không cần Podman/Docker daemon chạy)               |
+
+⚡ Ví dụ so sánh
+🔹 Cách 1 – Dùng Podman
+```
+podman login quay.io
+podman tag ubi-sleep:latest quay.io/valentinouberti/ubi-sleep:1.0
+podman push quay.io/valentinouberti/ubi-sleep:1.0
+```
+🔹 Cách 2 – Dùng Skopeo
+```
+skopeo login quay.io
+skopeo copy containers-storage:localhost/ubi-sleep:latest docker://quay.io/valentinouberti/ubi-sleep:1.0
+```
+
+📦 Kết quả cuối cùng y hệt nhau: image ubi-sleep:1.0 xuất hiện trên Quay.io.
+Chỉ khác ở công cụ và cách tiếp cận.
+
+🧠 Kết luận dễ nhớ
+
+| Trường hợp                                                                  | Dùng cái nào                 |
+| --------------------------------------------------------------------------- | ---------------------------- |
+| Bạn đang làm việc local, đã build image bằng Podman → push lên registry     | 🟢 **Podman (`tag + push`)** |
+| Bạn cần copy image giữa 2 registry, hoặc trong CI/CD không có Podman daemon | 🟢 **Skopeo (`copy`)**       |
+| Bạn muốn automation, kiểm tra, hoặc copy định dạng OCI/tar                  | 🟢 **Skopeo**                |
+
+
+👉 Tóm lại:
+
+Nếu bạn chỉ cần push image local lên Quay.io và đã podman login, thì podman tag + push hoàn toàn đủ — nhanh, gọn, và giống skopeo copy.
+
+Nhưng nếu bạn muốn copy giữa nhiều nguồn khác nhau (registry ↔ tar ↔ local), hoặc chạy script trong CI/CD, thì skopeo mạnh hơn nhiều.
+
+---
+
+🧩 Tình huống giả định
+
+Giả sử bạn có:
+
+Một image trên Docker Hub:
+🐳 docker.io/library/nginx:latest
+
+Bạn muốn copy image đó sang Quay.io của bạn:
+📦 quay.io/valentinouberti/nginx:latest
+
+🚀 Cách làm với skopeo (không cần pull về local)
+```
+skopeo copy docker://docker.io/library/nginx:latest docker://quay.io/valentinouberti/nginx:latest
+```
+🔍 Giải thích:
+| Thành phần                                          | Ý nghĩa                                                        |
+| --------------------------------------------------- | -------------------------------------------------------------- |
+| `skopeo copy`                                       | Sao chép image                                                 |
+| `docker://docker.io/library/nginx:latest`           | Nguồn là image từ Docker Hub                                   |
+| `docker://quay.io/valentinouberti/nginx:latest`     | Đích là image trên Quay.io                                     |
+| 👉 Không cần `podman pull` hoặc `docker pull` trước | `skopeo` xử lý stream trực tiếp giữa hai registry qua HTTP API |
+
+
+| Registry                        | Cần đăng nhập không?             | Lý do                                                                     |
+| ------------------------------- | -------------------------------- | ------------------------------------------------------------------------- |
+| 🐳 **Docker Hub** (`docker.io`) | ❌ Không cần nếu image **public** | Ví dụ `library/nginx` là public, ai cũng pull được                        |
+| 📦 **Quay.io**                  | ✅ BẮT BUỘC cần login             | Vì bạn đang **push** (ghi lên repo của bạn), cần quyền ghi (write access) |
+
+

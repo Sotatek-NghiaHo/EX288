@@ -1,0 +1,17 @@
+#s2i needs three components:
+- Source code
+- s2i scripts (these scripts must be executable inside the builder image, can be written in any programming languages. Usefull for customize the build process)
+- s2i builder image
+
+#s2i scripts (inside the builder image)
+
+assemble (mandatory) #build app from source code and place files in correct directory inside the image
+run      (mandatory) #this script run the app
+save-artifacts       #save dependencies for incremental builds
+usage                #show image usage
+test/run             #testing purpose
+
+For overriding default s2i script, create a .s2i/bin folder in the app source code repository
+
+
+the default directory for s2i script inside the builder image is : /usr/libexec/s2i

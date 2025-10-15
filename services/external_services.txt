@@ -1,0 +1,3 @@
+#Create external service
+oc create service externalname <service_name> --external-name host.to.connect.com | ipv4
+oc get endpoints 
